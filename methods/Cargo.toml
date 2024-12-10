@@ -4,7 +4,7 @@ version = { workspace = true }
 edition = { workspace = true }
 
 [package.metadata.risc0]
-methods = ["guest"]
+methods = ["validator_membership"]
 
 [build-dependencies]
 hex = { workspace = true }
@@ -16,3 +16,7 @@ risc0-zkp = { workspace = true }
 alloy-primitives = { workspace = true }
 alloy-sol-types = { workspace = true }
 risc0-zkvm = { workspace = true, features = ["client"] }
+apps = { path = "../apps" }
+lido-oracle-core = { path = "../core" }
+bitvec = { workspace = true }
+ethereum-consensus = { workspace = true }

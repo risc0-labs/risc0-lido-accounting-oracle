@@ -1,7 +1,8 @@
-use ethereum_consensus::ssz::prelude::{
+use ssz_rs::prelude::{
     proofs::{Proof, ProofAndWitness, Prover},
     GeneralizedIndex, Node, Path, SimpleSerialize,
 };
+
 use serde::ser::SerializeSeq;
 
 #[derive(Debug)]
@@ -47,6 +48,7 @@ impl<T: SimpleSerialize> MultiproofBuilder<T> {
 ///
 /// This is serializable and deserializable an intended to be passed to the ZKVM for verification
 ///
+#[derive(Debug, PartialEq)]
 pub struct Multiproof {
     proofs: Vec<Proof>,
 }
@@ -76,48 +78,46 @@ impl Multiproof {
 }
 
 impl serde::Serialize for Multiproof {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
         let mut seq = serializer.serialize_seq(Some(self.proofs.len()))?;
         for proof in &self.proofs {
-            seq.serialize_element(&proof.leaf)?;
-            seq.serialize_element(&proof.branch)?;
-            seq.serialize_element(&proof.index)?;
+            seq.serialize_element(&(proof.leaf, proof.branch.clone(), proof.index))?;
         }
         seq.end()
     }
 }
 
 impl<'de> serde::Deserialize<'de> for Multiproof {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
         struct MultiproofVisitor;
 
         impl<'de> serde::de::Visitor<'de> for MultiproofVisitor {
             type Value = Multiproof;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("a sequence of proofs")
+                formatter.write_str("a sequence of serialized proofs")
             }
 
-            fn visit_seq<V>(self, mut seq: V) -> Result<Self::Value, V::Error>
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
             where
-                V: serde::de::SeqAccess<'de>,
+                A: serde::de::SeqAccess<'de>,
             {
                 let mut proofs = Vec::new();
-
-                while let Some(leaf) = seq.next_element()? {
-                    let branch: Vec<Node> = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::invalid_length(proofs.len() * 3 + 1, &self)
-                    })?;
-                    let index: GeneralizedIndex = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::invalid_length(proofs.len() * 3 + 2, &self)
-                    })?;
+                while let Some((leaf, branch, index)) =
+                    seq.next_element::<(Node, Vec<Node>, GeneralizedIndex)>()?
+                {
                     proofs.push(Proof {
                         leaf,
                         branch,
                         index,
                     });
                 }
-
                 Ok(Multiproof { proofs })
             }
         }
@@ -130,7 +130,14 @@ impl<'de> serde::Deserialize<'de> for Multiproof {
 mod tests {
     use super::*;
     use ethereum_consensus::phase0::presets::mainnet::BeaconState;
-    use ethereum_consensus::ssz::prelude::*;
+    use risc0_zkvm::serde::{from_slice, to_vec};
+    use ssz_rs::prelude::*;
+
+    fn test_roundtrip_serialization(multiproof: &Multiproof) {
+        let serialized = to_vec(multiproof).unwrap();
+        let deserialized: Multiproof = from_slice(&serialized).unwrap();
+        assert_eq!(multiproof, &deserialized);
+    }
 
     #[test]
     fn test_proving_validator_fields() {
@@ -162,6 +169,8 @@ mod tests {
         multiproof
             .verify(beacon_state.hash_tree_root().unwrap())
             .unwrap();
+
+        test_roundtrip_serialization(&multiproof);
     }
 
     #[test]
@@ -177,5 +186,7 @@ mod tests {
         multiproof
             .verify(beacon_state.hash_tree_root().unwrap())
             .unwrap();
+
+        test_roundtrip_serialization(&multiproof);
     }
 }
