@@ -67,7 +67,7 @@ mod tests {
     use ethereum_consensus::ssz::prelude::*;
 
     #[test]
-    fn test_multiproof_builder() {
+    fn test_proving_validator_fields() {
         let mut beacon_state = BeaconState::default();
 
         let multiproof = MultiproofBuilder::<BeaconState>::new()
@@ -86,7 +86,7 @@ mod tests {
         let multiproof = MultiproofBuilder::<BeaconState>::new()
             .with_path(&[
                 "validators".into(),
-                1.into(),
+                0.into(),
                 "withdrawal_credentials".into(),
             ])
             .unwrap()
@@ -96,15 +96,20 @@ mod tests {
         multiproof
             .verify(beacon_state.hash_tree_root().unwrap())
             .unwrap();
+    }
 
-        let multiproof = MultiproofBuilder::<List<Validator, { VALIDATOR_REGISTRY_LIMIT }>>::new()
-            .with_path(&[PathElement::Length])
+    #[test]
+    fn test_proving_state_roots() {
+        let mut beacon_state = BeaconState::default();
+
+        let multiproof = MultiproofBuilder::<BeaconState>::new()
+            .with_path(&["state_roots".into(), 0.into()])
             .unwrap()
-            .build(&beacon_state.validators)
+            .build(&beacon_state)
             .unwrap();
 
         multiproof
-            .verify(beacon_state.validators.hash_tree_root().unwrap())
+            .verify(beacon_state.hash_tree_root().unwrap())
             .unwrap();
     }
 }
