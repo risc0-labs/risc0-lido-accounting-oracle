@@ -64,6 +64,50 @@ pub struct Validator {
     withdrawable_epoch: Epoch,
 }
 
+pub fn validator_balance_gindex<
+    const SLOTS_PER_HISTORICAL_ROOT: usize,
+    const VALIDATOR_REGISTRY_LIMIT: usize,
+>(
+    validataor_index: usize,
+) -> anyhow::Result<GeneralizedIndex> {
+    let gindex =
+        BeaconState::<SLOTS_PER_HISTORICAL_ROOT, VALIDATOR_REGISTRY_LIMIT>::generalized_index(&[
+            "balances".into(),
+            validataor_index.into(),
+        ])?;
+    Ok(gindex)
+}
+
+pub fn validator_withdrawal_credentials_gindex<
+    const SLOTS_PER_HISTORICAL_ROOT: usize,
+    const VALIDATOR_REGISTRY_LIMIT: usize,
+>(
+    validataor_index: usize,
+) -> anyhow::Result<GeneralizedIndex> {
+    let gindex =
+        BeaconState::<SLOTS_PER_HISTORICAL_ROOT, VALIDATOR_REGISTRY_LIMIT>::generalized_index(&[
+            "validators".into(),
+            validataor_index.into(),
+            "withdrawal_credentials".into(),
+        ])?;
+    Ok(gindex)
+}
+
+pub fn validator_exit_epoch_gindex<
+    const SLOTS_PER_HISTORICAL_ROOT: usize,
+    const VALIDATOR_REGISTRY_LIMIT: usize,
+>(
+    validataor_index: usize,
+) -> anyhow::Result<GeneralizedIndex> {
+    let gindex =
+        BeaconState::<SLOTS_PER_HISTORICAL_ROOT, VALIDATOR_REGISTRY_LIMIT>::generalized_index(&[
+            "validators".into(),
+            validataor_index.into(),
+            "exit_epoch".into(),
+        ])?;
+    Ok(gindex)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

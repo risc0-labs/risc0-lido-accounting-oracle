@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use ssz_rs::prelude::{
     proofs::{Proof, ProofAndWitness, Prover},
     GeneralizedIndex, Node, Path, SimpleSerialize,
@@ -6,27 +8,38 @@ use ssz_rs::prelude::{
 use serde::ser::SerializeSeq;
 
 #[derive(Debug)]
-pub struct MultiproofBuilder<T> {
+pub struct MultiproofBuilder {
     gindices: Vec<GeneralizedIndex>,
-    _phantom: std::marker::PhantomData<T>,
 }
 
-impl<T: SimpleSerialize> MultiproofBuilder<T> {
+impl MultiproofBuilder {
     pub fn new() -> Self {
         Self {
             gindices: Vec::new(),
-            _phantom: std::marker::PhantomData,
         }
     }
 
-    pub fn with_path(mut self, path: Path) -> anyhow::Result<Self> {
+    pub fn with_path<T: SimpleSerialize>(mut self, path: Path) -> anyhow::Result<Self> {
         self.gindices.push(T::generalized_index(path)?);
         Ok(self)
     }
 
+    pub fn with_gindex(mut self, gindex: GeneralizedIndex) -> Self {
+        self.gindices.push(gindex);
+        self
+    }
+
+    pub fn with_gindices<'a, I>(mut self, gindices: I) -> Self
+    where
+        I: IntoIterator<Item = &'a GeneralizedIndex>,
+    {
+        self.gindices.extend(gindices);
+        self
+    }
+
     // build the multi-proof for a given
-    pub fn build(self, container: &T) -> anyhow::Result<Multiproof> {
-        let proofs_and_witnesses = self
+    pub fn build<T: SimpleSerialize>(self, container: &T) -> anyhow::Result<Multiproof> {
+        let proofs = self
             .gindices
             .iter()
             .map(|gindex| {
@@ -35,9 +48,9 @@ impl<T: SimpleSerialize> MultiproofBuilder<T> {
                 Ok(ProofAndWitness::from(prover).0)
             })
             .collect::<anyhow::Result<Vec<Proof>>>()?;
-
         Ok(Multiproof {
-            proofs: proofs_and_witnesses,
+            proofs,
+            values: None,
         })
     }
 }
@@ -51,6 +64,11 @@ impl<T: SimpleSerialize> MultiproofBuilder<T> {
 #[derive(Debug, PartialEq)]
 pub struct Multiproof {
     proofs: Vec<Proof>,
+    /// A lookup table for the leaf values by gindex
+    /// This duplicates the leaf values in the proofs but is useful for quick lookups
+    /// we might be able to do better with a more efficient data structure
+    /// This is not serialized
+    values: Option<BTreeMap<GeneralizedIndex, Node>>,
 }
 
 impl Multiproof {
@@ -65,15 +83,23 @@ impl Multiproof {
     /// Get the leaf value at a given path with respect to the SSZ type T
     /// If this multiproof has been verified the returned leaf value can be trusted
     /// Note this is currently not an efficient way to get leaf values since it iterates over all the proofs
-    pub fn get<T: SimpleSerialize>(&self, path: Path) -> Option<Node> {
-        let gindex = T::generalized_index(path).ok()?;
-        self.proofs.iter().find_map(|proof| {
-            if proof.index == gindex {
-                Some(proof.leaf)
-            } else {
-                None
-            }
-        })
+    pub fn get(&self, gindex: GeneralizedIndex) -> anyhow::Result<Option<&Node>> {
+        if let Some(values) = &self.values {
+            Ok(values.get(&gindex))
+        } else {
+            Err(anyhow::anyhow!(
+                "Values lookup not built. Call build_values_lookup() first"
+            ))
+        }
+    }
+
+    pub fn build_values_lookup(&mut self) {
+        let values = self
+            .proofs
+            .iter()
+            .map(|proof| (proof.index, proof.leaf))
+            .collect();
+        self.values = Some(values);
     }
 }
 
@@ -118,7 +144,10 @@ impl<'de> serde::Deserialize<'de> for Multiproof {
                         index,
                     });
                 }
-                Ok(Multiproof { proofs })
+                Ok(Multiproof {
+                    proofs,
+                    values: None,
+                })
             }
         }
 
@@ -143,8 +172,8 @@ mod tests {
     fn test_proving_validator_fields() {
         let mut beacon_state = BeaconState::default();
 
-        let multiproof = MultiproofBuilder::<BeaconState>::new()
-            .with_path(&["validators".into()])
+        let multiproof = MultiproofBuilder::new()
+            .with_path::<BeaconState>(&["validators".into()])
             .unwrap()
             .build(&beacon_state)
             .unwrap();
@@ -156,8 +185,8 @@ mod tests {
         // Add a validator to the state
         beacon_state.validators.push(Default::default());
 
-        let multiproof = MultiproofBuilder::<BeaconState>::new()
-            .with_path(&[
+        let multiproof = MultiproofBuilder::new()
+            .with_path::<BeaconState>(&[
                 "validators".into(),
                 0.into(),
                 "withdrawal_credentials".into(),
@@ -177,8 +206,8 @@ mod tests {
     fn test_proving_state_roots() {
         let beacon_state = BeaconState::default();
 
-        let multiproof = MultiproofBuilder::<BeaconState>::new()
-            .with_path(&["state_roots".into(), 10.into()])
+        let multiproof = MultiproofBuilder::new()
+            .with_path::<BeaconState>(&["state_roots".into(), 10.into()])
             .unwrap()
             .build(&beacon_state)
             .unwrap();

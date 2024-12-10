@@ -35,7 +35,7 @@ mod tests {
             prior_slot: 0,
             prior_max_validator_index: 0,
             max_validator_index: 10,
-            withdrawal_credentials: Node::ZERO,
+            withdrawal_credentials: Node::ZERO, 
             prior_membership: Vec::new(),
             current_state_root: U256::ZERO,
             multiproof: block_root_proof,
