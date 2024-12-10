@@ -16,3 +16,10 @@ risc0-ethereum-contracts = { workspace = true }
 risc0-zkvm = { workspace = true, features = ["client"] }
 tokio = { version = "1.35", features = ["full"] }
 url = { workspace = true }
+
+ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus.git", rev = "8fbd8a53dca0170bedeca40a92ee70fd48c4615b" }
+
+serde.workspace = true
+thiserror = "2.0.6"
+reqwest = "0.12.9"
+serde_json = "1.0.133"
