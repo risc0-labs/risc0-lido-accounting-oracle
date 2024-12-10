@@ -18,39 +18,32 @@ include!(concat!(env!("OUT_DIR"), "/methods.rs"));
 #[cfg(test)]
 mod tests {
     use alloy_primitives::U256;
-    use bitvec::prelude::*;
     use lido_oracle_core::{Input, MultiproofBuilder};
     use risc0_zkvm::{default_executor, sha::Digest, ExecutorEnv};
 
     #[test]
-    fn test_sending_multiproof() {
+    fn test_sending_multiproof() -> anyhow::Result<()> {
         let state = ethereum_consensus::phase0::presets::mainnet::BeaconState::default();
 
         let block_root_proof = MultiproofBuilder::new()
-            .with_path(&["block_roots".into(), 0.into()])
-            .unwrap()
-            .build(&state)
-            .unwrap();
+            .with_path(&["state_roots".into(), 0.into()])?
+            .build(&state)?;
 
         let input = Input {
-            self_program_id: Digest::ZERO,
+            self_program_id: crate::VALIDATOR_MEMBERSHIP_ID.into(),
             prior_state_root: U256::ZERO,
+            prior_slot: 0,
             prior_max_validator_index: 0,
             withdrawal_credentials: U256::ZERO,
-            // prior_membership: BitVec::new(),
+            prior_membership: Vec::new(),
             current_state_root: U256::ZERO,
             multiproof: block_root_proof,
         };
 
-        let env = ExecutorEnv::builder()
-            .write(&input)
-            .unwrap()
-            .build()
-            .unwrap();
+        let env = ExecutorEnv::builder().write(&input)?.build()?;
 
         // NOTE: Use the executor to run tests without proving.
-        let session_info = default_executor()
-            .execute(env, super::VALIDATOR_MEMBERSHIP_ELF)
-            .unwrap();
+        let session_info = default_executor().execute(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
+        Ok(())
     }
 }

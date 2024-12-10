@@ -1,5 +1,4 @@
 use alloy_primitives::U256;
-use bitvec::prelude::*;
 use risc0_zkvm::sha::Digest;
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -15,10 +14,15 @@ pub struct Input {
 
     /// The state root of the state used in the previous proof
     pub prior_state_root: U256,
+    /// The slot of the state used in the previous proof
+    pub prior_slot: u64,
     /// The maximum validator index in the state used in the previous proof
     pub prior_max_validator_index: u64,
-    // The membership for validators [0, prior_max_validator_index] to be extended
-    // pub prior_membership: BitVec,
+
+    /// The membership for validators [0, prior_max_validator_index] to be extended
+    /// This is stored as a bitfield but typed as a Vec<u32> for serialization
+    pub prior_membership: Vec<u32>,
+
     /// Merkle SSZ proof that the prior state root is a pre-state of the current state
     pub multiproof: crate::Multiproof,
 }
@@ -29,5 +33,5 @@ pub struct Journal {
     pub state_root: U256,
     pub max_validator_index: u64,
     pub withdrawal_credentials: U256,
-    pub membership: BitVec,
+    pub membership: Vec<u32>,
 }

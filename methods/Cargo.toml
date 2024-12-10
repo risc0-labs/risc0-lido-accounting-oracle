@@ -20,3 +20,4 @@ apps = { path = "../apps" }
 lido-oracle-core = { path = "../core" }
 bitvec = { workspace = true }
 ethereum-consensus = { workspace = true }
+anyhow = { workspace = true }

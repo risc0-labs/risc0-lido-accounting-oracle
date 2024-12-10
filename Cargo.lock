@@ -2745,6 +2745,7 @@ version = "0.1.0"
 dependencies = [
  "alloy-primitives 0.8.15",
  "alloy-sol-types",
+ "anyhow",
  "apps",
  "bitvec",
  "ethereum-consensus",
