@@ -1,8 +1,4 @@
-use alloy_primitives::U256;
-use bitvec::prelude::*;
-
-use risc0_zkvm::serde::to_vec;
-use risc0_zkvm::{guest::env, sha::Digest};
+use risc0_zkvm::guest::env;
 
 use lido_oracle_core::{
     beacon_types::presets::mainnet::{BeaconState, SLOTS_PER_HISTORICAL_ROOT},
@@ -10,34 +6,67 @@ use lido_oracle_core::{
 };
 
 pub fn main() {
-    let input: Input = env::read::<Input>();
+    let Input {
+        self_program_id,
+        withdrawal_credentials,
+        current_state_root,
+        max_validator_index,
+        prior_state_root,
+        prior_slot,
+        prior_max_validator_index,
+        prior_membership,
+        multiproof,
+    } = env::read::<Input>();
 
-    // verify the multi-proof which verifies all contain values in one go
-    input
-        .multiproof
-        .verify(input.current_state_root.into())
+    // verify the multi-proof which verifies all contained values in one go
+    multiproof
+        .verify(current_state_root.into())
         .expect("Failed to verify multiproof");
 
     // Verify the prior membership proof
     let prior_proof_journal = Journal {
-        self_program_id: input.self_program_id,
-        state_root: input.prior_state_root,
-        max_validator_index: input.prior_max_validator_index,
-        withdrawal_credentials: input.withdrawal_credentials,
-        membership: input.prior_membership,
+        self_program_id: self_program_id,
+        state_root: prior_state_root,
+        max_validator_index: prior_max_validator_index,
+        withdrawal_credentials: withdrawal_credentials,
+        membership: prior_membership.clone(),
     };
-    // env::verify(input.self_program_id, &to_vec(&prior_proof_journal).unwrap()).expect("Failed to verify prior proof");
+    // env::verify(self_program_id, &to_vec(&prior_proof_journal).unwrap()).expect("Failed to verify prior proof");
 
     // Verify the pre-state requirement
     assert!(verify_is_prestate(
-        &input.multiproof,
-        input.prior_state_root.into(),
-        input.prior_slot as usize,
+        &multiproof,
+        prior_state_root.into(),
+        prior_slot as usize,
     ));
 
-    // Verify the inclusion proofs for every validator
+    // Extend the membership set with the new validators
+    let mut membership = Vec::with_capacity(max_validator_index as usize + 1);
+    membership.copy_from_slice(&prior_membership);
 
-    // Update the membership bitfield with the new validators
+    let validator_is_member = |validator_index: usize| {
+        multiproof
+            .get::<BeaconState>(&[
+                "validators".into(),
+                validator_index.into(),
+                "withdrawal_credentials".into(),
+            ])
+            .unwrap()
+            == withdrawal_credentials
+    };
+
+    for validator_index in (prior_max_validator_index + 1)..=max_validator_index {
+        membership.push(validator_is_member(validator_index as usize));
+    }
+
+    let journal = Journal {
+        self_program_id,
+        state_root: current_state_root,
+        max_validator_index,
+        withdrawal_credentials,
+        membership,
+    };
+    env::commit(&journal);
 }
 
 fn verify_is_prestate(multiproof: &Multiproof, prior_state_root: Node, prior_slot: usize) -> bool {

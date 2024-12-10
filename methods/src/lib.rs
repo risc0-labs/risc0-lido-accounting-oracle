@@ -18,7 +18,7 @@ include!(concat!(env!("OUT_DIR"), "/methods.rs"));
 #[cfg(test)]
 mod tests {
     use alloy_primitives::U256;
-    use lido_oracle_core::{Input, MultiproofBuilder};
+    use lido_oracle_core::{Input, MultiproofBuilder, Node};
     use risc0_zkvm::{default_executor, sha::Digest, ExecutorEnv};
 
     #[test]
@@ -34,7 +34,8 @@ mod tests {
             prior_state_root: U256::ZERO,
             prior_slot: 0,
             prior_max_validator_index: 0,
-            withdrawal_credentials: U256::ZERO,
+            max_validator_index: 10,
+            withdrawal_credentials: Node::ZERO,
             prior_membership: Vec::new(),
             current_state_root: U256::ZERO,
             multiproof: block_root_proof,
