@@ -9,6 +9,7 @@ builder = ["dep:ssz_rs"]
 
 [dependencies]
 serde.workspace = true
+sha2.workspace = true
 alloy-primitives.workspace = true
 risc0-zkvm.workspace = true
 bitvec.workspace = true

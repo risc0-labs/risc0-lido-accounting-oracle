@@ -8,7 +8,7 @@ use lido_oracle_core::{
 
 pub fn main() {
     let Input {
-        mut multiproof,
+        multiproof,
         current_state_root,
         proof_type,
         self_program_id,
@@ -21,7 +21,6 @@ pub fn main() {
     multiproof
         .verify(current_state_root)
         .expect("Failed to verify multiproof");
-    multiproof.build_values_lookup();
 
     let (prior_up_to_validator_index, mut membership) = match proof_type {
         ProofType::Initial => (0, Vec::new()),
@@ -55,7 +54,6 @@ pub fn main() {
                     .try_into()
                     .unwrap(),
             )
-            .unwrap()
             .expect("Missing withdrawal_credential value in the multiproof")
             == &withdrawal_credentials
     };
@@ -82,7 +80,6 @@ pub fn main() {
 fn verify_is_prestate(multiproof: &Multiproof, prior_state_root: B256, prior_slot: u64) -> bool {
     multiproof
         .get(state_roots_gindex(prior_slot).try_into().unwrap())
-        .unwrap()
         .expect("missing state_root value in multiproof")
         == &prior_state_root
 }

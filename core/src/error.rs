@@ -4,11 +4,14 @@ pub enum Error {
     #[error("Error in merklization: {0}")]
     Merklization(#[from] ssz_rs::MerkleizationError),
 
-    #[error("Value lookup table not build. Call build_value_lookup_table() first.")]
-    ValueLookupNotBuild,
+    #[error("Attempted to use an invalid gindex. Cannot be zero")]
+    InvalidGeneralizedIndex,
 
     #[error("Failed to convert between integers: {0}")]
     IntegerConversion(#[from] std::num::TryFromIntError),
+
+    #[error("Attempted to verify an invalid merkle multiproof")]
+    InvalidProof,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

@@ -1005,6 +1005,7 @@ dependencies = [
  "bitvec",
  "risc0-zkvm",
  "serde",
+ "sha2",
  "thiserror",
 ]
 

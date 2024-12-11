@@ -1,14 +1,11 @@
 use std::collections::BTreeMap;
 
+use crate::error::{Error, Result};
+use crate::verify_merkle_multiproof;
 use alloy_primitives::FixedBytes;
 use serde::ser::SerializeSeq;
 #[cfg(feature = "builder")]
-use ssz_rs::prelude::{
-    proofs::{Proof, ProofAndWitness, Prover},
-    GeneralizedIndex, Path, SimpleSerialize,
-};
-
-use crate::error::{Error, Result};
+use ssz_rs::prelude::{proofs::Proof, GeneralizedIndex, GeneralizedIndexable, Path, Prove};
 
 pub type Node = alloy_primitives::B256;
 
@@ -26,7 +23,7 @@ impl MultiproofBuilder {
         }
     }
 
-    pub fn with_path<T: SimpleSerialize>(mut self, path: Path) -> Self {
+    pub fn with_path<T: GeneralizedIndexable>(mut self, path: Path) -> Self {
         self.gindices
             .push(T::generalized_index(path).expect("Path is not valid for this type"));
         self
@@ -46,38 +43,17 @@ impl MultiproofBuilder {
     }
 
     // build the multi-proof for a given
-    pub fn build<T: SimpleSerialize>(self, container: &T) -> Result<Multiproof> {
-        let proofs = self
-            .gindices
-            .iter()
-            .map(|gindex| {
-                let mut prover = Prover::from(*gindex);
-                prover.compute_proof(container)?;
-                Ok(ProofAndWitness::from(prover).0.into())
-            })
-            .collect::<Result<Vec<_>>>()?;
+    pub fn build<T: Prove>(self, container: &T) -> Result<Multiproof> {
+        let (multiproof, _root) = container.multi_prove_gindices(&self.gindices)?;
         Ok(Multiproof {
-            proofs,
-            values: None,
+            branch: multiproof.branch,
+            indexed_leaves: multiproof
+                .indices
+                .into_iter()
+                .map(|i| i as u64)
+                .zip(multiproof.leaves.into_iter())
+                .collect(),
         })
-    }
-}
-
-#[derive(Debug, PartialEq)]
-struct InternalProof {
-    pub leaf: FixedBytes<32>,
-    pub branch: Vec<FixedBytes<32>>,
-    pub index: u64,
-}
-
-#[cfg(feature = "builder")]
-impl From<Proof> for InternalProof {
-    fn from(proof: Proof) -> Self {
-        InternalProof {
-            leaf: proof.leaf,
-            branch: proof.branch,
-            index: proof.index as u64,
-        }
     }
 }
 
@@ -87,93 +63,25 @@ impl From<Proof> for InternalProof {
 ///
 /// This is serializable and deserializable an intended to be passed to the ZKVM for verification
 ///
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Default, serde::Serialize, serde::Deserialize)]
 pub struct Multiproof {
-    proofs: Vec<InternalProof>,
-    /// A lookup table for the leaf values by gindex
-    /// This duplicates the leaf values in the proofs but is useful for quick lookups
-    /// we might be able to do better with a more efficient data structure
-    /// This is not serialized
-    values: Option<BTreeMap<u64, Node>>,
+    branch: Vec<Node>,
+    indexed_leaves: BTreeMap<u64, Node>,
 }
 
 impl Multiproof {
     /// Verify this multi-proof against a given root
     /// TODO: Not doing any verifying rn!!
     pub fn verify(&self, root: Node) -> Result<()> {
-        self.proofs.iter().try_for_each(|proof| Ok(()))
+        let leaves = self.indexed_leaves.values().cloned().collect::<Vec<_>>();
+        let indices = self.indexed_leaves.keys().cloned().collect::<Vec<_>>();
+        verify_merkle_multiproof(&leaves, &self.branch, &indices, root)
     }
 
     /// Get the leaf value at a given path with respect to the SSZ type T
     /// If this multiproof has been verified the returned leaf value can be trusted
-    /// Note this is currently not an efficient way to get leaf values since it iterates over all the proofs
-    pub fn get(&self, gindex: u64) -> Result<Option<&Node>> {
-        if let Some(values) = &self.values {
-            Ok(values.get(&gindex))
-        } else {
-            Err(Error::ValueLookupNotBuild)
-        }
-    }
-
-    pub fn build_values_lookup(&mut self) {
-        let values = self
-            .proofs
-            .iter()
-            .map(|proof| (proof.index, proof.leaf))
-            .collect();
-        self.values = Some(values);
-    }
-}
-
-impl serde::Serialize for Multiproof {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let mut seq = serializer.serialize_seq(Some(self.proofs.len()))?;
-        for proof in &self.proofs {
-            seq.serialize_element(&(proof.leaf, proof.branch.clone(), proof.index))?;
-        }
-        seq.end()
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for Multiproof {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        struct MultiproofVisitor;
-
-        impl<'de> serde::de::Visitor<'de> for MultiproofVisitor {
-            type Value = Multiproof;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("a sequence of serialized proofs")
-            }
-
-            fn visit_seq<A>(self, mut seq: A) -> std::result::Result<Self::Value, A::Error>
-            where
-                A: serde::de::SeqAccess<'de>,
-            {
-                let mut proofs = Vec::new();
-                while let Some((leaf, branch, index)) =
-                    seq.next_element::<(Node, Vec<Node>, u64)>()?
-                {
-                    proofs.push(InternalProof {
-                        leaf,
-                        branch,
-                        index,
-                    });
-                }
-                Ok(Multiproof {
-                    proofs,
-                    values: None,
-                })
-            }
-        }
-
-        deserializer.deserialize_seq(MultiproofVisitor)
+    pub fn get(&self, gindex: u64) -> Option<&Node> {
+        self.indexed_leaves.get(&gindex)
     }
 }
 
