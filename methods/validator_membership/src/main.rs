@@ -50,7 +50,7 @@ pub fn main() {
                     .unwrap(),
             )
             .unwrap()
-            .unwrap()
+            .expect("Missing withdrawal_credential value in the multiproof")
             == &withdrawal_credentials
     };
 
@@ -72,6 +72,6 @@ fn verify_is_prestate(multiproof: &Multiproof, prior_state_root: B256, prior_slo
     multiproof
         .get(state_roots_gindex(prior_slot).try_into().unwrap())
         .unwrap()
-        .unwrap()
+        .expect("missing state_root value in multiproof")
         == &prior_state_root
 }

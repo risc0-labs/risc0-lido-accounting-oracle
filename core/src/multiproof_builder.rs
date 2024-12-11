@@ -26,9 +26,10 @@ impl MultiproofBuilder {
         }
     }
 
-    pub fn with_path<T: SimpleSerialize>(mut self, path: Path) -> Result<Self> {
-        self.gindices.push(T::generalized_index(path)?);
-        Ok(self)
+    pub fn with_path<T: SimpleSerialize>(mut self, path: Path) -> Self {
+        self.gindices
+            .push(T::generalized_index(path).expect("Path is not valid for this type"));
+        self
     }
 
     pub fn with_gindex(mut self, gindex: GeneralizedIndex) -> Self {
@@ -38,7 +39,7 @@ impl MultiproofBuilder {
 
     pub fn with_gindices<'a, I>(mut self, gindices: I) -> Self
     where
-        I: IntoIterator<Item = &'a GeneralizedIndex>,
+        I: IntoIterator<Item = GeneralizedIndex>,
     {
         self.gindices.extend(gindices);
         self
@@ -193,9 +194,9 @@ mod tests {
     fn test_proving_validator_fields() {
         let mut beacon_state = BeaconState::default();
 
-        let multiproof = MultiproofBuilder::new()
+        let builder = MultiproofBuilder::new();
+        let multiproof = builder
             .with_path::<BeaconState>(&["validators".into()])
-            .unwrap()
             .build(&beacon_state)
             .unwrap();
 
@@ -212,7 +213,6 @@ mod tests {
                 0.into(),
                 "withdrawal_credentials".into(),
             ])
-            .unwrap()
             .build(&beacon_state)
             .unwrap();
 
@@ -229,7 +229,6 @@ mod tests {
 
         let multiproof = MultiproofBuilder::new()
             .with_path::<BeaconState>(&["state_roots".into(), 10.into()])
-            .unwrap()
             .build(&beacon_state)
             .unwrap();
 

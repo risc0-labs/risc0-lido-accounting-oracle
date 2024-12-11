@@ -17,30 +17,46 @@ include!(concat!(env!("OUT_DIR"), "/methods.rs"));
 
 #[cfg(test)]
 mod tests {
-    use alloy_primitives::U256;
+    use alloy_primitives::B256;
     use ethereum_consensus::phase0::presets::mainnet::BeaconState;
     use ethereum_consensus::ssz::prelude::*;
-    use lido_oracle_core::{Input, MultiproofBuilder, Node};
+    use lido_oracle_core::{
+        gindices::presets::mainnet::{state_roots_gindex, validator_withdrawal_credentials_gindex},
+        Input, MultiproofBuilder,
+    };
     use risc0_zkvm::{default_executor, sha::Digest, ExecutorEnv};
 
     #[test]
     fn test_sending_multiproof() -> anyhow::Result<()> {
-        let state = BeaconState::default();
+        let prior_max_validator_index = 0;
+        let max_validator_index = 10;
 
-        let block_root_proof = MultiproofBuilder::new()
-            .with_path::<BeaconState>(&["state_roots".into(), 0.into()])?
-            .build(&state)?;
+        let mut beacon_state = BeaconState::default();
+        // add empty validators to the state
+        for _ in prior_max_validator_index..=max_validator_index {
+            beacon_state.validators.push(Default::default());
+        }
+
+        let multiproof = MultiproofBuilder::new()
+            .with_gindex(state_roots_gindex(0).try_into()?)
+            .with_gindices((prior_max_validator_index..=max_validator_index).map(|i| {
+                validator_withdrawal_credentials_gindex(i)
+                    .try_into()
+                    .unwrap()
+            }))
+            .build(&beacon_state)
+            .unwrap();
 
         let input = Input {
             self_program_id: crate::VALIDATOR_MEMBERSHIP_ID.into(),
-            prior_state_root: U256::ZERO,
+            prior_state_root: B256::ZERO,
             prior_slot: 0,
             prior_max_validator_index: 0,
             max_validator_index: 10,
-            withdrawal_credentials: Node::ZERO,
+            withdrawal_credentials: B256::ZERO,
             prior_membership: Vec::new(),
-            current_state_root: state.hash_tree_root().unwrap().into(),
-            multiproof: block_root_proof,
+            current_state_root: beacon_state.hash_tree_root().unwrap().into(),
+            multiproof,
         };
 
         let env = ExecutorEnv::builder().write(&input)?.build()?;
