@@ -1,36 +1,37 @@
 use std::collections::BTreeMap;
-
-use crate::error::{Error, Result};
-use crate::verify_merkle_multiproof;
-use alloy_primitives::FixedBytes;
-use serde::ser::SerializeSeq;
 #[cfg(feature = "builder")]
-use ssz_rs::prelude::{proofs::Proof, GeneralizedIndex, GeneralizedIndexable, Path, Prove};
+use {
+    ssz_rs::prelude::{GeneralizedIndex, GeneralizedIndexable, Path, Prove},
+    std::collections::BTreeSet,
+};
+
+use crate::error::Result;
+use crate::verify_merkle_multiproof;
 
 pub type Node = alloy_primitives::B256;
 
 #[cfg(feature = "builder")]
 #[derive(Debug)]
 pub struct MultiproofBuilder {
-    gindices: Vec<GeneralizedIndex>,
+    gindices: BTreeSet<GeneralizedIndex>,
 }
 
 #[cfg(feature = "builder")]
 impl MultiproofBuilder {
     pub fn new() -> Self {
         Self {
-            gindices: Vec::new(),
+            gindices: BTreeSet::new(),
         }
     }
 
     pub fn with_path<T: GeneralizedIndexable>(mut self, path: Path) -> Self {
         self.gindices
-            .push(T::generalized_index(path).expect("Path is not valid for this type"));
+            .insert(T::generalized_index(path).expect("Path is not valid for this type"));
         self
     }
 
     pub fn with_gindex(mut self, gindex: GeneralizedIndex) -> Self {
-        self.gindices.push(gindex);
+        self.gindices.insert(gindex);
         self
     }
 
@@ -44,7 +45,8 @@ impl MultiproofBuilder {
 
     // build the multi-proof for a given
     pub fn build<T: Prove>(self, container: &T) -> Result<Multiproof> {
-        let (multiproof, _root) = container.multi_prove_gindices(&self.gindices)?;
+        let gindices = self.gindices.into_iter().collect::<Vec<_>>();
+        let (multiproof, _root) = container.multi_prove_gindices(&gindices)?;
         Ok(Multiproof {
             branch: multiproof.branch,
             indexed_leaves: multiproof
@@ -71,11 +73,8 @@ pub struct Multiproof {
 
 impl Multiproof {
     /// Verify this multi-proof against a given root
-    /// TODO: Not doing any verifying rn!!
     pub fn verify(&self, root: Node) -> Result<()> {
-        let leaves = self.indexed_leaves.values().cloned().collect::<Vec<_>>();
-        let indices = self.indexed_leaves.keys().cloned().collect::<Vec<_>>();
-        verify_merkle_multiproof(&leaves, &self.branch, &indices, root)
+        verify_merkle_multiproof(&self.indexed_leaves, &self.branch, root)
     }
 
     /// Get the leaf value at a given path with respect to the SSZ type T

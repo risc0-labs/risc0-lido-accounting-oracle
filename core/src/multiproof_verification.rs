@@ -2,7 +2,7 @@
 //! It is reimplemented here for a few reasons:
 //! - We don't want to depend on the ssz-rs crate in the program as it doesn't play nice
 //! - Need to use u64 for GeneralizedIndex rather than usize when building for rv32im
-//! - This is the crux of the verification and it needs to be ultra efficient. Keeping it here makes it easier to code golf
+//! - This is the crux of the verification and it needs to be ultra efficient. Keeping it here makes it easier to code golf and in the future to audit
 //!
 //! There is a lot of low hanging fruit for optimization here, this is a very naive implementation!!
 //!  
@@ -15,11 +15,11 @@ use std::collections::{BTreeMap, BTreeSet};
 type Node = alloy_primitives::B256;
 type GeneralizedIndex = u64;
 
-pub const fn sibling(index: GeneralizedIndex) -> GeneralizedIndex {
+const fn sibling(index: GeneralizedIndex) -> GeneralizedIndex {
     index ^ 1
 }
 
-pub const fn parent(index: GeneralizedIndex) -> GeneralizedIndex {
+const fn parent(index: GeneralizedIndex) -> GeneralizedIndex {
     index / 2
 }
 
@@ -45,11 +45,11 @@ fn get_path_indices(tree_index: GeneralizedIndex) -> Vec<GeneralizedIndex> {
     result
 }
 
-pub fn get_helper_indices(indices: &[GeneralizedIndex]) -> Vec<GeneralizedIndex> {
+fn get_helper_indices(indexed_leaves: &BTreeMap<GeneralizedIndex, Node>) -> Vec<GeneralizedIndex> {
     let mut all_helper_indices = BTreeSet::new();
     let mut all_path_indices = BTreeSet::new();
 
-    for index in indices {
+    for index in indexed_leaves.keys() {
         all_helper_indices.extend(get_branch_indices(*index).iter());
         all_path_indices.extend(get_path_indices(*index).iter());
     }
@@ -63,25 +63,19 @@ pub fn get_helper_indices(indices: &[GeneralizedIndex]) -> Vec<GeneralizedIndex>
 }
 
 pub fn calculate_multi_merkle_root(
-    leaves: &[Node],
+    indexed_leaves: &BTreeMap<GeneralizedIndex, Node>,
     proof: &[Node],
-    indices: &[GeneralizedIndex],
 ) -> Result<Node, Error> {
-    if leaves.len() != indices.len() {
-        return Err(Error::InvalidProof);
-    }
-    let helper_indices = get_helper_indices(indices);
+    let helper_indices = get_helper_indices(indexed_leaves);
     if proof.len() != helper_indices.len() {
         return Err(Error::InvalidProof);
     }
 
-    let mut objects = BTreeMap::new();
-    for (index, node) in indices.iter().zip(leaves.iter()) {
-        objects.insert(*index, *node);
-    }
-    for (index, node) in helper_indices.iter().zip(proof.iter()) {
-        objects.insert(*index, *node);
-    }
+    // TODO: This sorting and calculation of the helper indices can be done outside the zkvm
+
+    let mut objects = BTreeMap::<GeneralizedIndex, Node>::new();
+    objects.extend(indexed_leaves);
+    objects.extend(helper_indices.iter().zip(proof.iter()));
 
     let mut keys = objects.keys().cloned().collect::<Vec<_>>();
     keys.sort_by(|a, b| b.cmp(a));
@@ -115,12 +109,11 @@ pub fn calculate_multi_merkle_root(
 }
 
 pub fn verify_merkle_multiproof(
-    leaves: &[Node],
+    indexed_leaves: &BTreeMap<GeneralizedIndex, Node>,
     proof: &[Node],
-    indices: &[GeneralizedIndex],
     root: Node,
 ) -> Result<(), Error> {
-    if calculate_multi_merkle_root(leaves, proof, indices)? == root {
+    if calculate_multi_merkle_root(indexed_leaves, proof)? == root {
         Ok(())
     } else {
         Err(Error::InvalidProof)

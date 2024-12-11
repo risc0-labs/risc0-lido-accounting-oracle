@@ -29,7 +29,7 @@ mod tests {
     #[test]
     fn test_initial_proof() -> anyhow::Result<()> {
         let prior_up_to_validator_index = 0;
-        let up_to_validator_index = 10;
+        let up_to_validator_index = 1000;
 
         let mut beacon_state = BeaconState::default();
 
@@ -37,6 +37,8 @@ mod tests {
         for _ in prior_up_to_validator_index..up_to_validator_index {
             beacon_state.validators.push(Default::default());
         }
+
+        println!("Starting building multiproof");
 
         let multiproof = MultiproofBuilder::new()
             .with_gindex(state_roots_gindex(0).try_into()?)
@@ -50,6 +52,8 @@ mod tests {
             .build(&beacon_state)
             .unwrap();
 
+        println!("end building multiproof");
+
         let input = Input {
             self_program_id: crate::VALIDATOR_MEMBERSHIP_ID.into(),
             proof_type: ProofType::Initial,
@@ -61,6 +65,7 @@ mod tests {
 
         let env = ExecutorEnv::builder().write(&input)?.build()?;
 
+        println!("Starting execution of the program");
         // NOTE: Use the executor to run tests without proving.
         let session_info = default_executor().execute(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
         println!("total cycles: {:?}", session_info.cycles());
