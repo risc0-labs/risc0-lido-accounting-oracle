@@ -1,7 +1,5 @@
-use alloy_primitives::U256;
+use alloy_primitives::B256;
 use risc0_zkvm::sha::Digest;
-use ssz_rs::prelude::Node;
-
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Input {
     /// The Program ID of this program. Need to accept it as input rather than hard-code otherwise it creates a cyclic hash reference
@@ -9,14 +7,14 @@ pub struct Input {
     pub self_program_id: Digest,
 
     /// The withdrawal credentials we are searching for a match with
-    pub withdrawal_credentials: Node,
+    pub withdrawal_credentials: B256,
     /// The state root of the state used in the current proof
-    pub current_state_root: U256,
+    pub current_state_root: B256,
     /// the top validator index the membership proof will be extended to
     pub max_validator_index: u64,
 
     /// The state root of the state used in the previous proof
-    pub prior_state_root: U256,
+    pub prior_state_root: B256,
     /// The slot of the state used in the previous proof
     pub prior_slot: u64,
     /// The maximum validator index in the state used in the previous proof
@@ -32,8 +30,8 @@ pub struct Input {
 #[derive(serde::Serialize)]
 pub struct Journal {
     pub self_program_id: Digest,
-    pub state_root: U256,
+    pub state_root: B256,
     pub max_validator_index: u64,
-    pub withdrawal_credentials: Node,
+    pub withdrawal_credentials: B256,
     pub membership: Vec<bool>,
 }

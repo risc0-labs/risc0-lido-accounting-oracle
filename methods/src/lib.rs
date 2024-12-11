@@ -18,15 +18,17 @@ include!(concat!(env!("OUT_DIR"), "/methods.rs"));
 #[cfg(test)]
 mod tests {
     use alloy_primitives::U256;
+    use ethereum_consensus::phase0::presets::mainnet::BeaconState;
+    use ethereum_consensus::ssz::prelude::*;
     use lido_oracle_core::{Input, MultiproofBuilder, Node};
     use risc0_zkvm::{default_executor, sha::Digest, ExecutorEnv};
 
     #[test]
     fn test_sending_multiproof() -> anyhow::Result<()> {
-        let state = ethereum_consensus::phase0::presets::mainnet::BeaconState::default();
+        let state = BeaconState::default();
 
         let block_root_proof = MultiproofBuilder::new()
-            .with_path(&["state_roots".into(), 0.into()])?
+            .with_path::<BeaconState>(&["state_roots".into(), 0.into()])?
             .build(&state)?;
 
         let input = Input {
@@ -35,9 +37,9 @@ mod tests {
             prior_slot: 0,
             prior_max_validator_index: 0,
             max_validator_index: 10,
-            withdrawal_credentials: Node::ZERO, 
+            withdrawal_credentials: Node::ZERO,
             prior_membership: Vec::new(),
-            current_state_root: U256::ZERO,
+            current_state_root: state.hash_tree_root().unwrap().into(),
             multiproof: block_root_proof,
         };
 
