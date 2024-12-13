@@ -1,10 +1,10 @@
 use alloy_primitives::B256;
-use risc0_zkvm::{guest::env, serde::to_vec};
-
+use bitvec::prelude::*;
 use lido_oracle_core::{
     gindices::presets::mainnet::{state_roots_gindex, validator_withdrawal_credentials_gindex},
     Input, Journal, Multiproof, ProofType,
 };
+use risc0_zkvm::{guest::env, serde::to_vec};
 
 pub fn main() {
     let Input {
@@ -23,7 +23,7 @@ pub fn main() {
         .expect("Failed to verify multiproof");
 
     let (prior_up_to_validator_index, mut membership) = match proof_type {
-        ProofType::Initial => (0, Vec::new()),
+        ProofType::Initial => (0, BitVec::<u32, Lsb0>::new()),
         ProofType::Continuation {
             prior_state_root,
             prior_slot,
@@ -59,9 +59,7 @@ pub fn main() {
     };
 
     for validator_index in prior_up_to_validator_index..up_to_validator_index {
-        if validator_is_member(validator_index) {
-            membership.push(validator_index);
-        }
+        membership.push(validator_is_member(validator_index));
     }
 
     let journal = Journal {

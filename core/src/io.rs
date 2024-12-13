@@ -1,5 +1,6 @@
 use alloy_primitives::B256;
 use risc0_zkvm::sha::Digest;
+use bitvec::prelude::*;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Input {
@@ -28,7 +29,7 @@ pub enum ProofType {
         prior_state_root: B256,
         prior_slot: u64,
         prior_up_to_validator_index: u64,
-        prior_membership: Vec<u64>,
+        prior_membership: BitVec<u32, Lsb0>,
     },
 }
 
@@ -38,5 +39,5 @@ pub struct Journal {
     pub state_root: B256,
     pub up_to_validator_index: u64,
     pub withdrawal_credentials: B256,
-    pub membership: Vec<u64>,
+    pub membership: BitVec<u32, Lsb0>,
 }

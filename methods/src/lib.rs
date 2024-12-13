@@ -18,6 +18,7 @@ include!(concat!(env!("OUT_DIR"), "/methods.rs"));
 #[cfg(test)]
 mod tests {
     use alloy_primitives::B256;
+    use bitvec::prelude::*;
     use ethereum_consensus::phase0::presets::mainnet::BeaconState;
     use ethereum_consensus::ssz::prelude::*;
     use lido_oracle_core::{
@@ -29,7 +30,7 @@ mod tests {
     #[test]
     fn test_initial_proof() -> anyhow::Result<()> {
         let prior_up_to_validator_index = 0;
-        let up_to_validator_index = 1000;
+        let up_to_validator_index = 3;
 
         let mut beacon_state = BeaconState::default();
 
