@@ -8,4 +8,4 @@ pub use io::{Input, Journal, ProofType};
 pub use multiproof_builder::Multiproof;
 #[cfg(feature = "builder")]
 pub use multiproof_builder::MultiproofBuilder;
-pub use multiproof_verification::verify_merkle_multiproof;
+pub(crate) use multiproof_verification::verify_merkle_multiproof;

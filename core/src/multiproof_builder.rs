@@ -1,11 +1,11 @@
-use std::collections::BTreeMap;
 #[cfg(feature = "builder")]
 use {
+    ssz_rs::multiproofs::get_helper_indices,
     ssz_rs::prelude::{GeneralizedIndex, GeneralizedIndexable, Path, Prove},
     std::collections::BTreeSet,
 };
 
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::verify_merkle_multiproof;
 
 pub type Node = alloy_primitives::B256;
@@ -43,44 +43,57 @@ impl MultiproofBuilder {
         self
     }
 
-    // build the multi-proof for a given
+    // build the multi-proof for a given container
+    // the resulting multi-proof will be sorted by descending gindex in both the leaves and proof nodes
     pub fn build<T: Prove>(self, container: &T) -> Result<Multiproof> {
         let gindices = self.gindices.into_iter().collect::<Vec<_>>();
         let (multiproof, _root) = container.multi_prove_gindices(&gindices)?;
-        Ok(Multiproof {
-            branch: multiproof.branch,
-            indexed_leaves: multiproof
-                .indices
-                .into_iter()
-                .map(|i| i as u64)
-                .zip(multiproof.leaves.into_iter())
-                .collect(),
-        })
+        let leaves = multiproof.leaves;
+        let proof = multiproof.branch;
+        let proof_indices = get_helper_indices(&gindices);
+
+        // Sort gindices and leaves descending by gindex
+        let mut leaves: Vec<_> = gindices.into_iter().map(|i| i as u64).zip(leaves).collect();
+        leaves.sort_by(|a, b| b.0.cmp(&a.0));
+
+        // sort proof and proof_indices descending by gindex
+        let mut proof: Vec<_> = proof_indices
+            .into_iter()
+            .map(|i| i as u64)
+            .zip(proof)
+            .collect();
+        proof.sort_by(|a, b| b.0.cmp(&a.0));
+
+        Ok(Multiproof { leaves, proof })
     }
 }
 
 /// An abstraction around a SSZ merkle multi-proof
-/// Currently this does naive multi-proofs (e.g. no sharing of internal tree nodes)
-/// just to get the ball rolling. This can be replaced with proper multi-proofs without changing the API.
 ///
-/// This is serializable and deserializable an intended to be passed to the ZKVM for verification
+/// This is serializable and deserializable an intended to be passed to the ZKVM for verification.
+///
+/// The way to consume a multiproof is via its IntoIterator implementation.
+/// It will iterate over all gindices and leaf values that the proof guarantees inclusion for
+/// in order of increasing gindex
 ///
 #[derive(Debug, PartialEq, Default, serde::Serialize, serde::Deserialize)]
 pub struct Multiproof {
-    branch: Vec<Node>,
-    indexed_leaves: BTreeMap<u64, Node>,
+    /// The proof nodes
+    proof: Vec<(u64, Node)>,
+
+    /// gindices of the leaves of the tree we want to prove
+    leaves: Vec<(u64, Node)>,
 }
 
 impl Multiproof {
     /// Verify this multi-proof against a given root
     pub fn verify(&self, root: Node) -> Result<()> {
-        verify_merkle_multiproof(&self.indexed_leaves, &self.branch, root)
+        verify_merkle_multiproof(&self.leaves, &self.proof, root)
     }
 
-    /// Get the leaf value at a given path with respect to the SSZ type T
-    /// If this multiproof has been verified the returned leaf value can be trusted
-    pub fn get(&self, gindex: u64) -> Option<&Node> {
-        self.indexed_leaves.get(&gindex)
+    /// Returns an iterator over the leaves in order of descending gindex
+    pub fn leaves(&self) -> impl Iterator<Item = &(u64, Node)> {
+        self.leaves.iter()
     }
 }
 

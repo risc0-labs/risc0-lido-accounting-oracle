@@ -45,11 +45,11 @@ fn get_path_indices(tree_index: GeneralizedIndex) -> Vec<GeneralizedIndex> {
     result
 }
 
-fn get_helper_indices(indexed_leaves: &BTreeMap<GeneralizedIndex, Node>) -> Vec<GeneralizedIndex> {
+fn get_helper_indices(indices: &[GeneralizedIndex]) -> Vec<GeneralizedIndex> {
     let mut all_helper_indices = BTreeSet::new();
     let mut all_path_indices = BTreeSet::new();
 
-    for index in indexed_leaves.keys() {
+    for index in indices {
         all_helper_indices.extend(get_branch_indices(*index).iter());
         all_path_indices.extend(get_path_indices(*index).iter());
     }
@@ -62,21 +62,21 @@ fn get_helper_indices(indexed_leaves: &BTreeMap<GeneralizedIndex, Node>) -> Vec<
     all_branch_indices
 }
 
-pub fn calculate_multi_merkle_root(
-    indexed_leaves: &BTreeMap<GeneralizedIndex, Node>,
-    proof: &[Node],
+pub(crate) fn calculate_multi_merkle_root(
+    leaves: &[(GeneralizedIndex, Node)],
+    proof: &[(GeneralizedIndex, Node)],
 ) -> Result<Node, Error> {
-    let helper_indices = get_helper_indices(indexed_leaves);
-    if proof.len() != helper_indices.len() {
-        return Err(Error::InvalidProof);
+    // TODO: rewrite to avoid using BTreeMap
+    let mut objects = BTreeMap::new();
+    for (index, node) in leaves {
+        objects.insert(*index, *node);
+    }
+    for (index, node) in proof {
+        objects.insert(*index, *node);
     }
 
-    // TODO: This sorting and calculation of the helper indices can be done outside the zkvm
-
-    let mut objects = BTreeMap::<GeneralizedIndex, Node>::new();
-    objects.extend(indexed_leaves);
-    objects.extend(helper_indices.iter().zip(proof.iter()));
-
+    // TODO: This sorting can be done outside the prover
+    // sort all indexed nodes by descending gindex
     let mut keys = objects.keys().cloned().collect::<Vec<_>>();
     keys.sort_by(|a, b| b.cmp(a));
 
@@ -108,12 +108,12 @@ pub fn calculate_multi_merkle_root(
     Ok(root)
 }
 
-pub fn verify_merkle_multiproof(
-    indexed_leaves: &BTreeMap<GeneralizedIndex, Node>,
-    proof: &[Node],
+pub(crate) fn verify_merkle_multiproof(
+    leaves: &[(GeneralizedIndex, Node)],
+    proof: &[(GeneralizedIndex, Node)],
     root: Node,
 ) -> Result<(), Error> {
-    if calculate_multi_merkle_root(indexed_leaves, proof)? == root {
+    if calculate_multi_merkle_root(leaves, proof)? == root {
         Ok(())
     } else {
         Err(Error::InvalidProof)
