@@ -1,4 +1,3 @@
-mod balance_iterator;
 mod error;
 pub mod gindices;
 pub mod io;

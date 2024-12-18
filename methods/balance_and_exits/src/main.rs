@@ -23,18 +23,19 @@ pub fn main() {
     let mut num_exited_validators = 0;
 
     // accumulate the balances first
-    for validator_index in membership.iter_ones() {
+    let mut current_leaf = leaves.next().expect("Missing valdator balance value in multiproof");
+    for validator_index in membership.iter_ones().rev() {
         let expeted_gindex = validator_balance_gindex(validator_index as u64);
-        if current_index > expeted_gindex {
-            panic!("Missing validator balance value in multiproof");
+        if current_leaf.0 != expeted_gindex {
+            current_leaf = leaves.next().expect("Missing valdator balance value in multiproof");
         }
-        let (gindex, value) = leaves.next().expect("Missing valdator balance value in multiproof");
-        assert_eq!(*gindex, expeted_gindex);
-        cl_balance += value;
+        assert_eq!(current_leaf.0, expeted_gindex);
+        let balance = u64_from_node(&current_leaf.1, validator_index as usize % 4);
+        cl_balance += balance;
     }
 
     // Then the exit status
-    for validator_index in membership.iter_ones() {}
+    // for validator_index in membership.iter_ones() {}
 
     let journal = Journal {
         block_root,
@@ -43,4 +44,10 @@ pub fn main() {
         num_exited_validators,
     };
     env::commit(&journal);
+}
+
+/// Slice an 8 byte u64 out of a 32 byte chunk
+/// pos gives the position (e.g. first 8 bytes, second 8 bytes, etc.)
+fn u64_from_node(node: &B256, pos: usize) -> u64 {
+    u64::from_le_bytes(node[pos * 8..(pos + 1) * 8].try_into().unwrap())
 }
