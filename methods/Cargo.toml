@@ -4,7 +4,7 @@ version = { workspace = true }
 edition = { workspace = true }
 
 [package.metadata.risc0]
-methods = ["validator_membership"]
+methods = ["validator_membership", "balance_and_exits"]
 
 [build-dependencies]
 hex = { workspace = true }

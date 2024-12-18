@@ -66,7 +66,7 @@ pub(crate) fn calculate_multi_merkle_root(
     leaves: &[(GeneralizedIndex, Node)],
     proof: &[(GeneralizedIndex, Node)],
 ) -> Result<Node, Error> {
-    // TODO: rewrite to avoid using BTreeMap
+    // TODO: rewrite to avoid using BTreeMap, or at least build the map outside the zkvm
     let mut objects = BTreeMap::new();
     for (index, node) in leaves {
         objects.insert(*index, *node);

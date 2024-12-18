@@ -23,7 +23,8 @@ mod tests {
     use ethereum_consensus::ssz::prelude::*;
     use lido_oracle_core::{
         gindices::presets::mainnet::{state_roots_gindex, validator_withdrawal_credentials_gindex},
-        Input, MultiproofBuilder, ProofType,
+        io::validator_membership::{Input, ProofType},
+        MultiproofBuilder,
     };
     use risc0_zkvm::{default_executor, ExecutorEnv};
 
@@ -58,7 +59,6 @@ mod tests {
         let input = Input {
             self_program_id: crate::VALIDATOR_MEMBERSHIP_ID.into(),
             proof_type: ProofType::Initial,
-            withdrawal_credentials: B256::ZERO,
             current_state_root: beacon_state.hash_tree_root().unwrap().into(),
             up_to_validator_index,
             multiproof,

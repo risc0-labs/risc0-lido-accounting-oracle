@@ -4,6 +4,8 @@
         "./core/Cargo.toml",
         "./methods/Cargo.toml",
         "./methods/validator_membership/Cargo.toml",
+        "./methods/balance_and_exits/Cargo.toml",
+
     ],
     "rust-analyzer.check.extraEnv": {
         "RISC0_SKIP_BUILD": "1",
