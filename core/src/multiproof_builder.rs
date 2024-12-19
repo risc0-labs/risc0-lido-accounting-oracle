@@ -87,7 +87,7 @@ pub struct Multiproof {
 
 impl Multiproof {
     /// Verify this multi-proof against a given root
-    pub fn verify(&self, root: Node) -> Result<()> {
+    pub fn verify(&self, root: &Node) -> Result<()> {
         verify_merkle_multiproof(&self.leaves, &self.proof, root)
     }
 
@@ -121,7 +121,7 @@ mod tests {
             .unwrap();
 
         multiproof
-            .verify(beacon_state.hash_tree_root().unwrap())
+            .verify(&beacon_state.hash_tree_root().unwrap())
             .unwrap();
 
         // Add a validator to the state
@@ -137,7 +137,7 @@ mod tests {
             .unwrap();
 
         multiproof
-            .verify(beacon_state.hash_tree_root().unwrap())
+            .verify(&beacon_state.hash_tree_root().unwrap())
             .unwrap();
 
         test_roundtrip_serialization(&multiproof);
@@ -153,7 +153,7 @@ mod tests {
             .unwrap();
 
         multiproof
-            .verify(beacon_state.hash_tree_root().unwrap())
+            .verify(&beacon_state.hash_tree_root().unwrap())
             .unwrap();
 
         test_roundtrip_serialization(&multiproof);

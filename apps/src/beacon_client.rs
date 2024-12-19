@@ -4,7 +4,9 @@ use ethereum_consensus::{
     types::mainnet::{BeaconState, SignedBeaconBlock},
     Fork,
 };
+use http_cache_reqwest::{CACacheManager, Cache, CacheMode, HttpCache, HttpCacheOptions};
 use reqwest::IntoUrl;
+use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Display};
 use url::Url;
@@ -16,6 +18,8 @@ pub enum Error {
     Url(#[from] url::ParseError),
     #[error("HTTP request failed: {0}")]
     Http(#[from] reqwest::Error),
+    #[error("JSON request middleware failed: {0}")]
+    Middleware(#[from] reqwest_middleware::Error),
     #[error("version field does not match data version")]
     VersionMismatch,
 }
@@ -46,7 +50,7 @@ struct VersionedResponse<T> {
 
 /// Simple beacon API client for the `mainnet` preset that can query headers and blocks.
 pub struct BeaconClient {
-    http: reqwest::Client,
+    http: ClientWithMiddleware,
     endpoint: Url,
 }
 
@@ -55,7 +59,26 @@ impl BeaconClient {
     pub fn new<U: IntoUrl>(endpoint: U) -> Result<Self, Error> {
         let client = reqwest::Client::new();
         Ok(Self {
-            http: client,
+            http: client.into(),
+            endpoint: endpoint.into_url()?,
+        })
+    }
+
+    /// Creates a new beacon endpoint API client with caching.
+    pub fn new_with_cache<U: IntoUrl>(endpoint: U, cache_dir: &str) -> Result<Self, Error> {
+        let client = reqwest::Client::new();
+        let manager = CACacheManager {
+            path: cache_dir.into(),
+        };
+        let cache = Cache(HttpCache {
+            mode: CacheMode::ForceCache,
+            manager,
+            options: HttpCacheOptions::default(),
+        });
+        let client_with_middleware = ClientBuilder::new(client).with(cache).build();
+
+        Ok(Self {
+            http: client_with_middleware,
             endpoint: endpoint.into_url()?,
         })
     }
@@ -78,7 +101,7 @@ impl BeaconClient {
     }
 
     pub async fn get_state(&self, state_id: impl Display) -> Result<BeaconState, Error> {
-        let path = format!("/eth/v2/debug/beacon/states/{state_id}");
+        let path = format!("eth/v2/debug/beacon/states/{state_id}");
         let result: VersionedResponse<BeaconState> = self.http_get(&path).await?;
         if result.version.to_string() != result.inner.data.version().to_string() {
             return Err(Error::VersionMismatch);

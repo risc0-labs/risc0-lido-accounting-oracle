@@ -17,13 +17,14 @@ include!(concat!(env!("OUT_DIR"), "/methods.rs"));
 
 #[cfg(test)]
 mod tests {
-    use alloy_primitives::B256;
-    use bitvec::prelude::*;
     use ethereum_consensus::phase0::presets::mainnet::BeaconState;
     use ethereum_consensus::ssz::prelude::*;
     use lido_oracle_core::{
-        gindices::presets::mainnet::{state_roots_gindex, validator_withdrawal_credentials_gindex},
-        io::validator_membership::{Input, ProofType},
+        gindices::presets::mainnet::beacon_state::{state_roots, validator_withdrawal_credentials},
+        io::{
+            self,
+            validator_membership::{Input, Journal, ProofType},
+        },
         MultiproofBuilder,
     };
     use risc0_zkvm::{default_executor, ExecutorEnv};
@@ -31,25 +32,23 @@ mod tests {
     #[test]
     fn test_initial_proof() -> anyhow::Result<()> {
         let prior_up_to_validator_index = 0;
-        let up_to_validator_index = 3;
+        let up_to_validator_index = 100;
+        let n_validators = 100;
 
         let mut beacon_state = BeaconState::default();
 
         // add empty validators to the state
-        for _ in prior_up_to_validator_index..up_to_validator_index {
+        for _ in prior_up_to_validator_index..n_validators {
             beacon_state.validators.push(Default::default());
         }
 
         println!("Starting building multiproof");
 
         let multiproof = MultiproofBuilder::new()
-            .with_gindex(state_roots_gindex(0).try_into()?)
+            .with_gindex(state_roots(0).try_into()?)
             .with_gindices(
-                (prior_up_to_validator_index..up_to_validator_index).map(|i| {
-                    validator_withdrawal_credentials_gindex(i)
-                        .try_into()
-                        .unwrap()
-                }),
+                (prior_up_to_validator_index..up_to_validator_index)
+                    .map(|i| validator_withdrawal_credentials(i).try_into().unwrap()),
             )
             .build(&beacon_state)
             .unwrap();
@@ -69,7 +68,11 @@ mod tests {
         println!("Starting execution of the program");
         // NOTE: Use the executor to run tests without proving.
         let session_info = default_executor().execute(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
-        println!("total cycles: {:?}", session_info.cycles());
+        println!(
+            "program execution returned: {:?}",
+            session_info.journal.decode::<Journal>()?
+        );
+        println!("total cycles: {}", session_info.cycles());
         Ok(())
     }
 }

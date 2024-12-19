@@ -8,6 +8,8 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace.dependencies]
+lido-oracle-core.path = "./core"
+
 alloy = { version = "0.6", features = ["full"] }
 alloy-primitives = { version = "0.7", default-features = false, features = ["rlp", "serde", "std"] }
 alloy-sol-types = { version = "0.7" }
@@ -25,7 +27,7 @@ risc0-zkvm = { version = "1.2", default-features = false }
 risc0-zkp = { version = "1.2", default-features = false }
 
 ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus.git", rev = "8fbd8a53dca0170bedeca40a92ee70fd48c4615b", default-features = false, features = ["serde"] }
-ssz_rs = { git = "https://github.com/willemolding/ssz-rs", rev = "0085984c2bce8105570eb243dedc7a9c094745e8" }
+ssz_rs = { path = "../ssz-rs/ssz-rs" }
 
 serde = { version = "1.0", features = ["derive", "std"] }
 url = { version = "2.5" }
@@ -38,4 +40,4 @@ lto = true
 
 [patch."https://github.com/ralexstokes/ssz-rs"]
 # Get the merkle tree empty node virtualization so non-trivial merkle trees actually fit in memory
-ssz_rs = { git = "https://github.com/willemolding/ssz-rs", rev = "0085984c2bce8105570eb243dedc7a9c094745e8" }
+ssz_rs = { path = "../ssz-rs/ssz-rs" }

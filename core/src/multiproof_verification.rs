@@ -111,9 +111,9 @@ pub(crate) fn calculate_multi_merkle_root(
 pub(crate) fn verify_merkle_multiproof(
     leaves: &[(GeneralizedIndex, Node)],
     proof: &[(GeneralizedIndex, Node)],
-    root: Node,
+    root: &Node,
 ) -> Result<(), Error> {
-    if calculate_multi_merkle_root(leaves, proof)? == root {
+    if &calculate_multi_merkle_root(leaves, proof)? == root {
         Ok(())
     } else {
         Err(Error::InvalidProof)

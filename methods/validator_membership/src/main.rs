@@ -1,6 +1,6 @@
 use bitvec::prelude::*;
 use lido_oracle_core::{
-    gindices::presets::mainnet::{state_roots_gindex, validator_withdrawal_credentials_gindex},
+    gindices::presets::mainnet::beacon_state as beacon_state_gindices,
     io::validator_membership::{Input, Journal, ProofType},
     WITHDRAWAL_CREDENTIALS,
 };
@@ -17,7 +17,7 @@ pub fn main() {
 
     // verify the multi-proof which verifies leaf values
     multiproof
-        .verify(current_state_root)
+        .verify(&current_state_root)
         .expect("Failed to verify multiproof");
     let mut leaves = multiproof.leaves();
 
@@ -31,7 +31,7 @@ pub fn main() {
     };
 
     for validator_index in (prior_up_to_validator_index..up_to_validator_index).rev() {
-        let expeted_gindex = validator_withdrawal_credentials_gindex(validator_index);
+        let expeted_gindex = beacon_state_gindices::validator_withdrawal_credentials(validator_index);
         let (gindex, value) = leaves
             .next()
             .expect("Missing withdrawal_credentials value in multiproof");
@@ -46,10 +46,14 @@ pub fn main() {
         prior_membership,
     } = proof_type
     {
-        // Verify the pre-state requirement
-        let (gindex, value) = leaves.next().expect("Missing state_root value in multiproof");
-        assert_eq!(*gindex, state_roots_gindex(prior_slot));
-        assert_eq!(*value, prior_state_root);
+        // if this is not a continuation within the same slot then the prior state root should be available
+        // within the current state
+        if prior_state_root != current_state_root {
+            // Verify the pre-state requirement
+            let (gindex, value) = leaves.next().expect("Missing state_root value in multiproof");
+            assert_eq!(*gindex, beacon_state_gindices::state_roots(prior_slot));
+            assert_eq!(*value, prior_state_root);
+        }
 
         // Verify the prior membership proof
         let prior_proof_journal = Journal {

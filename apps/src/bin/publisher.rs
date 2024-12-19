@@ -16,45 +16,87 @@
 // to the Bonsai proving service and publish the received proofs directly
 // to your deployed app contract.
 
-use alloy::{
-    network::EthereumWallet, providers::ProviderBuilder, signers::local::PrivateKeySigner,
-    sol_types::SolValue,
-};
 use alloy_primitives::{Address, U256};
 use anyhow::{Context, Result};
+use apps::beacon_client::BeaconClient;
 use clap::Parser;
+use ethereum_consensus::types::mainnet::BeaconState;
 use methods::VALIDATOR_MEMBERSHIP_ELF;
 use risc0_ethereum_contracts::encode_seal;
-use risc0_zkvm::{default_prover, ExecutorEnv, ProverOpts, VerifierContext};
+use risc0_zkvm::{default_executor, serde::to_vec, ExecutorEnv, ProverOpts, VerifierContext};
+use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 use url::Url;
+
+use lido_oracle_core::io::validator_membership::{Input, Journal};
 
 /// Arguments of the publisher CLI.
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-    /// Ethereum chain ID
+    /// Ethereum beacon node HTTP RPC endpoint.
     #[clap(long)]
-    chain_id: u64,
+    beacon_rpc_url: Url,
 
-    /// Ethereum Node endpoint.
-    #[clap(long, env)]
-    eth_wallet_private_key: PrivateKeySigner,
-
-    /// Ethereum Node endpoint.
+    /// slot at which to generate an oracle proof for
     #[clap(long)]
-    rpc_url: Url,
+    slot: u64,
 
-    /// Application's contract address on Ethereum
     #[clap(long)]
-    contract: Address,
+    max_validator_index: u64,
 
-    /// The input to provide to the guest binary
-    #[clap(short, long)]
-    input: U256,
+    /// The slot used previously if this is a continuation
+    /// proof, otherwise None of this is the first proof
+    #[clap(long)]
+    prior_slot: Option<u64>,
+
+    /// The validator index used previously if this is a continuation
+    #[clap(long)]
+    prior_max_validator_index: Option<u64>,
 }
 
-fn main() -> Result<()> {
-    env_logger::init();
+#[tokio::main]
+async fn main() -> Result<()> {
+    tracing_subscriber::registry()
+        .with(fmt::layer())
+        .with(EnvFilter::from_default_env())
+        .init();
+
+    let args = Args::parse();
+
+    let beacon_client = BeaconClient::new_with_cache(args.beacon_rpc_url, "./beacon-cache")?;
+    let beacon_state = beacon_client.get_state(args.slot).await?;
+
+    let input = if let (Some(prior_slot), Some(prior_max_validator_index)) =
+        (args.prior_slot, args.prior_max_validator_index)
+    {
+        tracing::info!("Building input for continuation proof");
+
+        let prior_beacon_state = beacon_client.get_state(prior_slot).await?;
+        Input::build_continuation(
+            prior_beacon_state,
+            prior_max_validator_index,
+            beacon_state,
+            args.max_validator_index,
+        )?
+    } else {
+        tracing::info!("Building input for initial proof");
+        Input::build_initial(beacon_state, args.max_validator_index)?
+    };
+
+    tracing::debug!("Input: {:?}", input);
+    tracing::debug!("input size (bytes): {}", to_vec(&input)?.len() * 4);
+
+    let env = ExecutorEnv::builder().write(&input)?.build()?;
+
+    tracing::info!("Starting execution of the program");
+    let session_info = default_executor().execute(env, VALIDATOR_MEMBERSHIP_ELF)?;
+    tracing::debug!(
+        "program execution returned: {:?}",
+        session_info.journal.decode::<Journal>()?
+    );
+    tracing::info!("total cycles: {}", session_info.cycles());
+
+    tracing::info!("Complete");
 
     Ok(())
 }
