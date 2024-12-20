@@ -17,23 +17,18 @@ include!(concat!(env!("OUT_DIR"), "/methods.rs"));
 
 #[cfg(test)]
 mod tests {
-    use ethereum_consensus::phase0::presets::mainnet::BeaconState;
+    use ethereum_consensus::deneb::Validator;
+    use ethereum_consensus::phase0::presets::mainnet::{BeaconBlockHeader, BeaconState};
     use ethereum_consensus::ssz::prelude::*;
-    use lido_oracle_core::{
-        gindices::presets::mainnet::beacon_state::{state_roots, validator_withdrawal_credentials},
-        io::{
-            self,
-            validator_membership::{Input, Journal, ProofType},
-        },
-        MultiproofBuilder,
-    };
+    use lido_oracle_core::io::{balance_and_exits, validator_membership};
+    use lido_oracle_core::WITHDRAWAL_CREDENTIALS;
     use risc0_zkvm::{default_executor, ExecutorEnv};
 
     #[test]
     fn test_initial_proof() -> anyhow::Result<()> {
         let prior_up_to_validator_index = 0;
-        let up_to_validator_index = 100;
-        let n_validators = 100;
+        let up_to_validator_index = 1000;
+        let n_validators = 1000;
 
         let mut beacon_state = BeaconState::default();
 
@@ -41,36 +36,73 @@ mod tests {
         for _ in prior_up_to_validator_index..n_validators {
             beacon_state.validators.push(Default::default());
         }
+        let beacon_root = beacon_state.hash_tree_root()?;
 
-        println!("Starting building multiproof");
-
-        let multiproof = MultiproofBuilder::new()
-            .with_gindex(state_roots(0).try_into()?)
-            .with_gindices(
-                (prior_up_to_validator_index..up_to_validator_index)
-                    .map(|i| validator_withdrawal_credentials(i).try_into().unwrap()),
-            )
-            .build(&beacon_state)
-            .unwrap();
-
-        println!("end building multiproof");
-
-        let input = Input {
-            self_program_id: crate::VALIDATOR_MEMBERSHIP_ID.into(),
-            proof_type: ProofType::Initial,
-            current_state_root: beacon_state.hash_tree_root().unwrap().into(),
+        let input = validator_membership::Input::build_initial(
+            &ethereum_consensus::types::mainnet::BeaconState::Phase0(beacon_state),
             up_to_validator_index,
-            multiproof,
-        };
+        )?;
+
+        input.multiproof.verify(&beacon_root)?;
 
         let env = ExecutorEnv::builder().write(&input)?.build()?;
 
         println!("Starting execution of the program");
-        // NOTE: Use the executor to run tests without proving.
         let session_info = default_executor().execute(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
         println!(
             "program execution returned: {:?}",
-            session_info.journal.decode::<Journal>()?
+            session_info
+                .journal
+                .decode::<validator_membership::Journal>()?
+        );
+        println!("total cycles: {}", session_info.cycles());
+        Ok(())
+    }
+
+    #[test]
+    fn test_balance_and_exits() -> anyhow::Result<()> {
+        let n_empty_validators = 1000;
+        let n_lido_validators = 100;
+
+        let mut block_header = BeaconBlockHeader::default();
+        let mut beacon_state = BeaconState::default();
+
+        for _ in 0..n_empty_validators {
+            beacon_state.validators.push(Default::default());
+            beacon_state.balances.push(99);
+        }
+        for _ in 0..n_lido_validators {
+            beacon_state.validators.push(Validator {
+                withdrawal_credentials: WITHDRAWAL_CREDENTIALS.as_slice().try_into().unwrap(),
+                ..Default::default()
+            });
+            beacon_state.balances.push(10);
+        }
+        block_header.state_root = beacon_state.hash_tree_root()?.into();
+
+        let input = balance_and_exits::Input::build(
+            &block_header,
+            &ethereum_consensus::types::mainnet::BeaconState::Phase0(beacon_state.clone()),
+        )
+        .unwrap();
+
+        input
+            .block_multiproof
+            .verify(&block_header.hash_tree_root()?)?;
+
+        input
+            .state_multiproof
+            .verify(&beacon_state.hash_tree_root()?)?;
+
+        let env = ExecutorEnv::builder().write(&input)?.build()?;
+
+        println!("Starting execution of the program");
+        let session_info = default_executor().execute(env, super::BALANCE_AND_EXITS_ELF)?;
+        println!(
+            "program execution returned: {:?}",
+            session_info
+                .journal
+                .decode::<balance_and_exits::Journal>()?
         );
         println!("total cycles: {}", session_info.cycles());
         Ok(())

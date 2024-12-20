@@ -75,6 +75,10 @@ pub(crate) fn calculate_multi_merkle_root(
         objects.insert(*index, *node);
     }
 
+    if objects.is_empty() {
+        return Err(Error::EmptyProof);
+    }
+
     // TODO: This sorting can be done outside the prover
     // sort all indexed nodes by descending gindex
     let mut keys = objects.keys().cloned().collect::<Vec<_>>();
@@ -104,7 +108,7 @@ pub(crate) fn calculate_multi_merkle_root(
         pos += 1;
     }
 
-    let root = *objects.get(&1).expect("contains index");
+    let root = *objects.get(&1).expect("Root not calculated");
     Ok(root)
 }
 

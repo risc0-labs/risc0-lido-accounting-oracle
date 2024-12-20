@@ -45,7 +45,7 @@ impl MultiproofBuilder {
 
     // build the multi-proof for a given container
     // the resulting multi-proof will be sorted by descending gindex in both the leaves and proof nodes
-    pub fn build<T: Prove>(self, container: &T) -> Result<Multiproof> {
+    pub fn build<T: Prove + Sync>(self, container: &T) -> Result<Multiproof> {
         let gindices = self.gindices.into_iter().collect::<Vec<_>>();
         let (multiproof, _root) = container.multi_prove_gindices(&gindices)?;
         let leaves = multiproof.leaves;

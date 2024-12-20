@@ -34,7 +34,19 @@ pub fn main() {
     let mut cl_balance = 0;
     let mut num_exited_validators = 0;
 
-    // accumulate the balances first
+    // Iterate the validator exit epochs
+    for validator_index in membership.iter_ones().rev() {
+        let expeted_gindex = beacon_state_gindices::validator_exit_epoch(validator_index as u64);
+        let (gindex, value) = leaves
+            .next()
+            .expect("Missing withdrawal_credentials value in multiproof");
+        assert_eq!(gindex, &expeted_gindex);
+        if u64_from_b256(value, 0) <= current_epoch {
+            num_exited_validators += 1;
+        }
+    }
+
+    // accumulate the balances
     // This is a little tricky as multiple balances are packed into a single gindex
     let mut current_leaf = leaves.next().expect("Missing valdator balance value in multiproof");
     for validator_index in membership.iter_ones().rev() {
@@ -45,18 +57,6 @@ pub fn main() {
         assert_eq!(current_leaf.0, expeted_gindex);
         let balance = u64_from_b256(&current_leaf.1, validator_index as usize % 4);
         cl_balance += balance;
-    }
-
-    // Then the exit status
-    for validator_index in membership.iter_ones().rev() {
-        let expeted_gindex = beacon_state_gindices::validator_exit_epoch(validator_index as u64);
-        let (gindex, value) = leaves
-            .next()
-            .expect("Missing withdrawal_credentials value in multiproof");
-        assert_eq!(gindex, &expeted_gindex);
-        if u64_from_b256(value, 0) <= current_epoch {
-            num_exited_validators += 1;
-        }
     }
 
     let journal = Journal {

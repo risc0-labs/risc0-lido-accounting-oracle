@@ -1,8 +1,5 @@
 use ethereum_consensus::{
-    phase0::SignedBeaconBlockHeader,
-    primitives::Root,
-    types::mainnet::{BeaconState, SignedBeaconBlock},
-    Fork,
+    phase0::SignedBeaconBlockHeader, primitives::Root, types::mainnet::BeaconState, Fork,
 };
 use http_cache_reqwest::{CACacheManager, Cache, CacheMode, HttpCache, HttpCacheOptions};
 use reqwest::IntoUrl;
@@ -91,13 +88,13 @@ impl BeaconClient {
     }
 
     /// Retrieves block details for given block id.
-    pub async fn get_block(&self, block_id: impl Display) -> Result<SignedBeaconBlock, Error> {
-        let path = format!("eth/v2/beacon/blocks/{block_id}");
-        let result: VersionedResponse<SignedBeaconBlock> = self.http_get(&path).await?;
-        if result.version.to_string() != result.inner.data.version().to_string() {
-            return Err(Error::VersionMismatch);
-        }
-        Ok(result.inner.data)
+    pub async fn get_block_header(
+        &self,
+        block_id: impl Display,
+    ) -> Result<SignedBeaconBlockHeader, Error> {
+        let path = format!("eth/v1/beacon/headers/{block_id}");
+        let result: Response<GetBlockHeaderResponse> = self.http_get(&path).await?;
+        Ok(result.data.header)
     }
 
     pub async fn get_state(&self, state_id: impl Display) -> Result<BeaconState, Error> {
