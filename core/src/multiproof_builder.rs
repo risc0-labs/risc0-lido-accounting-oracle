@@ -123,11 +123,20 @@ impl Multiproof {
         }
     }
 
-    /// Creates an iterator over the leaves of the proof.
-    /// Note this will also iterate leaves that were not added explicitly
-    /// but are still needed to reconstruct the root
-    pub fn values(&self) -> LeafNodeIterator {
-        LeafNodeIterator::new(&self.descriptor, &self.nodes, &self.value_indices)
+    /// Creates an iterator the nodes in this proof along with their gindices
+    pub fn nodes(&self) -> impl Iterator<Item = (u64, &Node)> {
+        GIndexIterator::new(&self.descriptor).zip(self.nodes.iter())
+    }
+
+    /// Creates an iterator the values in this proof along with their gindices
+    pub fn values(&self) -> impl Iterator<Item = (u64, &Node)> {
+        self.nodes().enumerate().filter_map(|(i, node)| {
+            if self.value_indices.contains(&i) {
+                Some(node)
+            } else {
+                None
+            }
+        })
     }
 
     /// Finds the node corresponding to a given gindex.
@@ -135,79 +144,64 @@ impl Multiproof {
     ///
     /// Note this is a linear search, so it's not efficient for large proofs.
     /// If you are iterating over all leaves it is much more efficient to use the iterator instead
-    pub fn get(&self, gindex: u64) -> Option<Node> {
+    pub fn get(&self, gindex: u64) -> Option<&Node> {
         self.values()
             .find(|(g, _)| *g == gindex)
             .map(|(_, node)| node)
     }
 }
 
-pub struct LeafNodeIterator<'a> {
+/// Given a descriptor iterate over the gindices it describes
+struct GIndexIterator<'a> {
     descriptor: &'a BitVec<u8, Msb0>,
-    nodes: &'a Vec<Node>,
-    value_indices: &'a [usize],
     descriptor_index: usize,
-    proof_index: usize,
     current_gindex: u64,
+    stack: Vec<u64>, // Stack to simulate the traversal
 }
 
-impl<'a> LeafNodeIterator<'a> {
-    pub(crate) fn new(
-        descriptor: &'a BitVec<u8, Msb0>,
-        nodes: &'a Vec<Node>,
-        value_indices: &'a [usize],
-    ) -> LeafNodeIterator<'a> {
-        LeafNodeIterator {
+impl<'a> GIndexIterator<'a> {
+    fn new(descriptor: &'a BitVec<u8, Msb0>) -> Self {
+        GIndexIterator {
             descriptor,
-            nodes,
-            value_indices,
             descriptor_index: 0,
-            proof_index: 0,
             current_gindex: 1,
+            stack: vec![1],
         }
     }
 }
 
-impl<'a> Iterator for LeafNodeIterator<'a> {
-    /// Returns (node vec index, gindex, proof_node)
-    type Item = (u64, Node);
+impl<'a> Iterator for GIndexIterator<'a> {
+    type Item = u64;
 
     fn next(&mut self) -> Option<Self::Item> {
         while self.descriptor_index < self.descriptor.len() {
-            let gindex = self.current_gindex;
-
-            if self.descriptor[self.descriptor_index] {
-                // Check if it's a leaf
-                // let is_leaf = self.descriptor_index == self.descriptor.len() - 1
-                // || self.descriptor[self.descriptor_index + 1];
-                let is_value = self.value_indices.contains(&self.proof_index);
-                let result = (gindex, self.nodes[self.proof_index]);
-                self.proof_index += 1;
-                self.descriptor_index += 1;
-
-                if is_value {
-                    return Some(result);
-                }
-            } else {
-                // Move to the left or right child
-                self.descriptor_index += 1;
-            }
-
-            // Update gindex based on traversal
-            if self.descriptor[self.descriptor_index - 1] == false {
-                // If it's a `0` bit, we're traversing deeper:
-                // Left child = gindex * 2, Right child = gindex * 2 + 1
+            let bit = self.descriptor[self.descriptor_index];
+            self.descriptor_index += 1;
+            if !bit {
+                self.stack.push(self.current_gindex);
                 self.current_gindex *= 2;
             } else {
-                // If it's a `1` bit, go back up and adjust accordingly
-                while self.current_gindex % 2 == 1 {
-                    self.current_gindex /= 2;
-                }
-                self.current_gindex += 1;
+                let result = self.current_gindex;
+                self.current_gindex = self.stack.pop()? * 2 + 1;
+                return Some(result);
             }
         }
-
         None
+    }
+}
+
+#[cfg(test)]
+mod gtests {
+    #[test]
+    fn test_gindex_iterator() {
+        use super::*;
+        use bitvec::prelude::*;
+
+        let descriptor = bitvec![u8, Msb0; 0,0,1,0,0,1,0,1,1,1,1];
+        assert_eq!(
+            GIndexIterator::new(&descriptor).collect::<Vec<u64>>(),
+            vec![4, 20, 42, 43, 11, 3]
+        );
     }
 }
 
@@ -292,7 +286,7 @@ mod tests {
             multiproof.values().next(),
             Some((
                 gindex as u64,
-                super::Node::from_slice(
+                &super::Node::from_slice(
                     beacon_state.validators[0].withdrawal_credentials.as_slice()
                 )
             ))
@@ -319,9 +313,44 @@ mod tests {
 
         assert_eq!(
             multiproof.values().next(),
-            Some((gindex as u64, beacon_state.state_roots[10]))
+            Some((gindex as u64, &beacon_state.state_roots[10]))
         );
 
         test_roundtrip_serialization(&multiproof);
+    }
+
+    #[test]
+    fn building_for_membership() -> Result<()> {
+        let prior_up_to_validator_index = 0;
+        let up_to_validator_index = 1000;
+        let n_validators = 1000;
+
+        let mut beacon_state = BeaconState::default();
+
+        // add empty validators to the state
+        for _ in prior_up_to_validator_index..n_validators {
+            beacon_state.validators.push(Default::default());
+        }
+        let beacon_root = beacon_state.hash_tree_root()?;
+
+        let input = crate::io::validator_membership::Input::build_initial(
+            &ethereum_consensus::types::mainnet::BeaconState::Phase0(beacon_state),
+            up_to_validator_index,
+        )?;
+
+        input.multiproof.verify(&beacon_root)?;
+
+        let mut values = input.multiproof.values();
+        for validator_index in prior_up_to_validator_index..up_to_validator_index {
+            let expected_gindex =
+                crate::gindices::presets::mainnet::beacon_state::validator_withdrawal_credentials(
+                    validator_index,
+                );
+            let (gindex, _) = values
+                .next()
+                .expect("Missing withdrawal_credentials value in multiproof");
+            assert_eq!(gindex, expected_gindex);
+        }
+        Ok(())
     }
 }

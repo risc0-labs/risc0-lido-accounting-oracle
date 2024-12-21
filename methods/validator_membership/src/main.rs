@@ -43,7 +43,7 @@ pub fn main() {
             // Verify the pre-state requirement
             let (gindex, value) = values.next().expect("Missing state_root value in multiproof");
             assert_eq!(gindex, beacon_state_gindices::state_roots(prior_slot));
-            assert_eq!(value, prior_state_root);
+            assert_eq!(value, &prior_state_root);
         }
 
         // Verify the prior membership proof
@@ -62,7 +62,7 @@ pub fn main() {
             .next()
             .expect("Missing withdrawal_credentials value in multiproof");
         assert_eq!(gindex, expected_gindex);
-        membership.push(value == WITHDRAWAL_CREDENTIALS);
+        membership.push(value == &WITHDRAWAL_CREDENTIALS);
     }
 
     let journal = Journal {
