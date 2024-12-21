@@ -7,9 +7,10 @@
 //! There is a lot of low hanging fruit for optimization here, this is a very naive implementation!!
 //!  
 
-use sha2::{Digest, Sha256};
+use sha2::{digest::typenum::Bit, Digest, Sha256};
 
 use crate::error::Error;
+use bitvec::prelude::*;
 use std::collections::{BTreeMap, BTreeSet};
 
 type Node = alloy_primitives::B256;

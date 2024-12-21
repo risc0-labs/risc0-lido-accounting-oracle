@@ -16,6 +16,7 @@ bitvec.workspace = true
 ssz_rs = { workspace = true, optional = true }
 ethereum-consensus = { workspace = true, optional = true }
 thiserror = "2.0.6"
+tracing.workspace = true
 
 [dev-dependencies]
 ethereum-consensus.workspace = true

@@ -35,8 +35,8 @@ pub fn main() {
         let (gindex, value) = leaves
             .next()
             .expect("Missing withdrawal_credentials value in multiproof");
-        assert_eq!(*gindex, expeted_gindex);
-        membership.push(value == &WITHDRAWAL_CREDENTIALS);
+        assert_eq!(gindex, expeted_gindex);
+        membership.push(value == WITHDRAWAL_CREDENTIALS);
     }
 
     if let ProofType::Continuation {
@@ -51,8 +51,8 @@ pub fn main() {
         if prior_state_root != current_state_root {
             // Verify the pre-state requirement
             let (gindex, value) = leaves.next().expect("Missing state_root value in multiproof");
-            assert_eq!(*gindex, beacon_state_gindices::state_roots(prior_slot));
-            assert_eq!(*value, prior_state_root);
+            assert_eq!(gindex, beacon_state_gindices::state_roots(prior_slot));
+            assert_eq!(value, prior_state_root);
         }
 
         // Verify the prior membership proof

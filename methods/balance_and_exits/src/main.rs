@@ -22,10 +22,10 @@ pub fn main() {
         .leaves()
         .next()
         .expect("Missing state root in multiproof");
-    assert_eq!(state_root_gindex, &beacon_block_gindices::state_root());
+    assert_eq!(state_root_gindex, beacon_block_gindices::state_root());
 
     multiproof
-        .verify(state_root)
+        .verify(&state_root)
         .expect("Failed to verify state multiproof");
     let mut leaves = multiproof.leaves();
 
@@ -40,8 +40,8 @@ pub fn main() {
         let (gindex, value) = leaves
             .next()
             .expect("Missing withdrawal_credentials value in multiproof");
-        assert_eq!(gindex, &expeted_gindex);
-        if u64_from_b256(value, 0) <= current_epoch {
+        assert_eq!(gindex, expeted_gindex);
+        if u64_from_b256(&value, 0) <= current_epoch {
             num_exited_validators += 1;
         }
     }
