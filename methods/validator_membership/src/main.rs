@@ -19,7 +19,7 @@ pub fn main() {
     multiproof
         .verify(&current_state_root)
         .expect("Failed to verify multiproof");
-    let mut leaves = multiproof.leaves();
+    let mut values = multiproof.values();
 
     let (prior_up_to_validator_index, mut membership) = match proof_type {
         ProofType::Initial => (0, BitVec::<u32, Lsb0>::new()),
@@ -41,7 +41,7 @@ pub fn main() {
         // within the current state
         if prior_state_root != current_state_root {
             // Verify the pre-state requirement
-            let (gindex, value) = leaves.next().expect("Missing state_root value in multiproof");
+            let (gindex, value) = values.next().expect("Missing state_root value in multiproof");
             assert_eq!(gindex, beacon_state_gindices::state_roots(prior_slot));
             assert_eq!(value, prior_state_root);
         }
@@ -58,7 +58,7 @@ pub fn main() {
 
     for validator_index in prior_up_to_validator_index..up_to_validator_index {
         let expected_gindex = beacon_state_gindices::validator_withdrawal_credentials(validator_index);
-        let (gindex, value) = leaves
+        let (gindex, value) = values
             .next()
             .expect("Missing withdrawal_credentials value in multiproof");
         assert_eq!(gindex, expected_gindex);

@@ -1,5 +1,6 @@
 use crate::error::{Error, Result};
 use bitvec::prelude::*;
+use serde::de::value;
 use sha2::{Digest, Sha256};
 #[cfg(feature = "builder")]
 use {
@@ -61,7 +62,7 @@ impl MultiproofBuilder {
                 let mut prover = Prover::from(*index);
                 prover.compute_proof_cached_tree(container, &tree)?;
                 let proof = prover.into_proof();
-                if gindices.contains(index) {
+                if gindices.contains(&proof.index) {
                     value_indices.push(i);
                 }
                 Ok(proof.leaf)
@@ -123,15 +124,10 @@ impl Multiproof {
     }
 
     /// Creates an iterator over the leaves of the proof.
-    pub fn leaves(&self) -> MerkleProofIterator {
-        MerkleProofIterator {
-            descriptor: &self.descriptor,
-            nodes: &self.nodes,
-            value_indices: &self.value_indices,
-            descriptor_index: 0,
-            proof_index: 0,
-            current_gindex: 1,
-        }
+    /// Note this will also iterate leaves that were not added explicitly
+    /// but are still needed to reconstruct the root
+    pub fn values(&self) -> LeafNodeIterator {
+        LeafNodeIterator::new(&self.descriptor, &self.nodes, &self.value_indices)
     }
 
     /// Finds the node corresponding to a given gindex.
@@ -140,23 +136,40 @@ impl Multiproof {
     /// Note this is a linear search, so it's not efficient for large proofs.
     /// If you are iterating over all leaves it is much more efficient to use the iterator instead
     pub fn get(&self, gindex: u64) -> Option<Node> {
-        self.leaves()
+        self.values()
             .find(|(g, _)| *g == gindex)
             .map(|(_, node)| node)
     }
 }
 
-pub struct MerkleProofIterator<'a> {
+pub struct LeafNodeIterator<'a> {
     descriptor: &'a BitVec<u8, Msb0>,
     nodes: &'a Vec<Node>,
-    value_indices: &'a Vec<usize>,
+    value_indices: &'a [usize],
     descriptor_index: usize,
     proof_index: usize,
     current_gindex: u64,
 }
 
-impl<'a> Iterator for MerkleProofIterator<'a> {
-    /// Returns (gindex, proof_node)
+impl<'a> LeafNodeIterator<'a> {
+    pub(crate) fn new(
+        descriptor: &'a BitVec<u8, Msb0>,
+        nodes: &'a Vec<Node>,
+        value_indices: &'a [usize],
+    ) -> LeafNodeIterator<'a> {
+        LeafNodeIterator {
+            descriptor,
+            nodes,
+            value_indices,
+            descriptor_index: 0,
+            proof_index: 0,
+            current_gindex: 1,
+        }
+    }
+}
+
+impl<'a> Iterator for LeafNodeIterator<'a> {
+    /// Returns (node vec index, gindex, proof_node)
     type Item = (u64, Node);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -164,13 +177,16 @@ impl<'a> Iterator for MerkleProofIterator<'a> {
             let gindex = self.current_gindex;
 
             if self.descriptor[self.descriptor_index] {
+                // Check if it's a leaf
+                // let is_leaf = self.descriptor_index == self.descriptor.len() - 1
+                // || self.descriptor[self.descriptor_index + 1];
                 let is_value = self.value_indices.contains(&self.proof_index);
-                let result = self.nodes[self.proof_index];
+                let result = (gindex, self.nodes[self.proof_index]);
                 self.proof_index += 1;
                 self.descriptor_index += 1;
 
                 if is_value {
-                    return Some((gindex, result));
+                    return Some(result);
                 }
             } else {
                 // Move to the left or right child
@@ -273,7 +289,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            multiproof.leaves().next(),
+            multiproof.values().next(),
             Some((
                 gindex as u64,
                 super::Node::from_slice(
@@ -302,7 +318,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            multiproof.leaves().next(),
+            multiproof.values().next(),
             Some((gindex as u64, beacon_state.state_roots[10]))
         );
 
