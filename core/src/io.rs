@@ -44,13 +44,13 @@ pub mod validator_membership {
         ) -> Result<Self> {
             let current_state_root = beacon_state.hash_tree_root()?;
 
-            let proof_builder = crate::MultiproofBuilder::new()
-                .with_gindex(beacon_state_gindices::state_roots(0).try_into()?)
-                .with_gindices((0..up_to_validator_index).map(|i| {
+            let proof_builder = crate::MultiproofBuilder::new().with_gindices(
+                (0..up_to_validator_index).map(|i| {
                     beacon_state_gindices::validator_withdrawal_credentials(i)
                         .try_into()
                         .unwrap()
-                }));
+                }),
+            );
 
             let multiproof = build_with_versioned_state(proof_builder, beacon_state)?;
 

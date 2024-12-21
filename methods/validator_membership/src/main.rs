@@ -30,15 +30,6 @@ pub fn main() {
         } => (prior_up_to_validator_index, prior_membership.clone()),
     };
 
-    for validator_index in (prior_up_to_validator_index..up_to_validator_index).rev() {
-        let expeted_gindex = beacon_state_gindices::validator_withdrawal_credentials(validator_index);
-        let (gindex, value) = leaves
-            .next()
-            .expect("Missing withdrawal_credentials value in multiproof");
-        assert_eq!(gindex, expeted_gindex);
-        membership.push(value == WITHDRAWAL_CREDENTIALS);
-    }
-
     if let ProofType::Continuation {
         prior_state_root,
         prior_slot,
@@ -63,6 +54,15 @@ pub fn main() {
             membership: prior_membership.clone(),
         };
         env::verify(self_program_id, &to_vec(&prior_proof_journal).unwrap()).expect("Failed to verify prior proof");
+    }
+
+    for validator_index in prior_up_to_validator_index..up_to_validator_index {
+        let expected_gindex = beacon_state_gindices::validator_withdrawal_credentials(validator_index);
+        let (gindex, value) = leaves
+            .next()
+            .expect("Missing withdrawal_credentials value in multiproof");
+        assert_eq!(gindex, expected_gindex);
+        membership.push(value == WITHDRAWAL_CREDENTIALS);
     }
 
     let journal = Journal {

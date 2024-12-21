@@ -1,5 +1,4 @@
 use crate::error::{Error, Result};
-use crate::verify_merkle_multiproof;
 use bitvec::prelude::*;
 use sha2::{Digest, Sha256};
 #[cfg(feature = "builder")]
@@ -53,6 +52,7 @@ impl MultiproofBuilder {
         let proof_indices = compact_multiproofs::compute_proof_indices(&gindices);
 
         let tree = container.compute_tree()?;
+        let mut value_indices = Vec::new();
 
         let nodes: Vec<_> = proof_indices
             .iter() // TODO: parallelize
@@ -60,16 +60,21 @@ impl MultiproofBuilder {
             .map(|(i, index)| {
                 let mut prover = Prover::from(*index);
                 prover.compute_proof_cached_tree(container, &tree)?;
-                if i % 1000 == 0 {
-                    tracing::debug!("computed proof for node: {}/{}", i, proof_indices.len());
+                let proof = prover.into_proof();
+                if gindices.contains(index) {
+                    value_indices.push(i);
                 }
-                Ok(prover.into_proof().leaf)
+                Ok(proof.leaf)
             })
             .collect::<Result<Vec<_>>>()?;
 
         let descriptor = compact_multiproofs::compute_proof_descriptor(&gindices)?;
 
-        Ok(Multiproof { nodes, descriptor })
+        Ok(Multiproof {
+            nodes,
+            descriptor,
+            value_indices,
+        })
     }
 }
 
@@ -83,8 +88,11 @@ impl MultiproofBuilder {
 ///
 #[derive(Debug, PartialEq, Default, serde::Serialize, serde::Deserialize)]
 pub struct Multiproof {
-    /// The proof adn leaf nodes
+    /// The merkle tree nodes corresponding to both leaves and internal proof nodes
     nodes: Vec<Node>,
+
+    /// Indices into the nodes vector that correspond to the leaf values of interest
+    value_indices: Vec<usize>,
 
     /// bitvector describing the shape of the proof
     descriptor: BitVec<u8, Msb0>,
@@ -119,16 +127,29 @@ impl Multiproof {
         MerkleProofIterator {
             descriptor: &self.descriptor,
             nodes: &self.nodes,
+            value_indices: &self.value_indices,
             descriptor_index: 0,
             proof_index: 0,
             current_gindex: 1,
         }
+    }
+
+    /// Finds the node corresponding to a given gindex.
+    /// Returns None if the gindex is not in the proof.
+    ///
+    /// Note this is a linear search, so it's not efficient for large proofs.
+    /// If you are iterating over all leaves it is much more efficient to use the iterator instead
+    pub fn get(&self, gindex: u64) -> Option<Node> {
+        self.leaves()
+            .find(|(g, _)| *g == gindex)
+            .map(|(_, node)| node)
     }
 }
 
 pub struct MerkleProofIterator<'a> {
     descriptor: &'a BitVec<u8, Msb0>,
     nodes: &'a Vec<Node>,
+    value_indices: &'a Vec<usize>,
     descriptor_index: usize,
     proof_index: usize,
     current_gindex: u64,
@@ -143,14 +164,12 @@ impl<'a> Iterator for MerkleProofIterator<'a> {
             let gindex = self.current_gindex;
 
             if self.descriptor[self.descriptor_index] {
-                // Check if it's a leaf
-                let is_leaf = self.descriptor_index == self.descriptor.len() - 1
-                    || self.descriptor[self.descriptor_index + 1];
+                let is_value = self.value_indices.contains(&self.proof_index);
                 let result = self.nodes[self.proof_index];
                 self.proof_index += 1;
                 self.descriptor_index += 1;
 
-                if is_leaf {
+                if is_value {
                     return Some((gindex, result));
                 }
             } else {
@@ -221,7 +240,7 @@ mod tests {
 
     #[test]
     fn test_proving_validator_fields() {
-        let mut beacon_state = BeaconState::default();
+        let beacon_state = BeaconState::default();
 
         let builder = MultiproofBuilder::new();
         let multiproof = builder
@@ -234,20 +253,34 @@ mod tests {
             .unwrap();
 
         // Add a validator to the state
+        let mut beacon_state = BeaconState::default();
         beacon_state.validators.push(Default::default());
 
+        let gindex = BeaconState::generalized_index(&[
+            "validators".into(),
+            0.into(),
+            "withdrawal_credentials".into(),
+        ])
+        .expect("Invalid path for state_roots");
+
         let multiproof = MultiproofBuilder::new()
-            .with_path::<BeaconState>(&[
-                "validators".into(),
-                0.into(),
-                "withdrawal_credentials".into(),
-            ])
+            .with_gindex(gindex)
             .build(&beacon_state)
             .unwrap();
 
         multiproof
             .verify(&beacon_state.hash_tree_root().unwrap())
             .unwrap();
+
+        assert_eq!(
+            multiproof.leaves().next(),
+            Some((
+                gindex as u64,
+                super::Node::from_slice(
+                    beacon_state.validators[0].withdrawal_credentials.as_slice()
+                )
+            ))
+        );
 
         test_roundtrip_serialization(&multiproof);
     }
@@ -256,14 +289,22 @@ mod tests {
     fn test_proving_state_roots() {
         let beacon_state = BeaconState::default();
 
+        let gindex = BeaconState::generalized_index(&["state_roots".into(), 10.into()])
+            .expect("Invalid path for state_roots");
+
         let multiproof = MultiproofBuilder::new()
-            .with_path::<BeaconState>(&["state_roots".into(), 10.into()])
+            .with_gindex(gindex)
             .build(&beacon_state)
             .unwrap();
 
         multiproof
             .verify(&beacon_state.hash_tree_root().unwrap())
             .unwrap();
+
+        assert_eq!(
+            multiproof.leaves().next(),
+            Some((gindex as u64, beacon_state.state_roots[10]))
+        );
 
         test_roundtrip_serialization(&multiproof);
     }
