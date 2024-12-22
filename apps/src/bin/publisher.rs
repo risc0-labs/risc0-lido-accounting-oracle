@@ -16,20 +16,17 @@
 // to the Bonsai proving service and publish the received proofs directly
 // to your deployed app contract.
 
-use alloy_primitives::{Address, U256};
 use anyhow::{Context, Result};
 use apps::beacon_client::BeaconClient;
 use clap::Parser;
-use ethereum_consensus::{ssz::prelude::Path, types::mainnet::BeaconState};
 use guests::{BALANCE_AND_EXITS_ELF, VALIDATOR_MEMBERSHIP_ELF};
-use risc0_ethereum_contracts::encode_seal;
 use risc0_zkvm::{
     default_executor,
     serde::{from_slice, to_vec},
     ExecutorEnv, ProverOpts, VerifierContext,
 };
 use std::path::PathBuf;
-use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+use tracing_subscriber::fmt::{self, format::FmtSpan};
 use url::Url;
 
 /// Arguments of the publisher CLI.
@@ -73,9 +70,8 @@ enum Command {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    tracing_subscriber::registry()
-        .with(fmt::layer())
-        .with(EnvFilter::from_default_env())
+    tracing_subscriber::fmt()
+        .with_span_events(FmtSpan::ENTER | FmtSpan::EXIT)
         .init();
 
     let args = Args::parse();

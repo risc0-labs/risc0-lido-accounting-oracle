@@ -4808,6 +4808,7 @@ dependencies = [
 [[package]]
 name = "ssz_rs"
 version = "0.9.0"
+source = "git+https://github.com/willemolding/ssz-rs?rev=d351c06a1e47e7cfa2470c2571254bf44982064d#d351c06a1e47e7cfa2470c2571254bf44982064d"
 dependencies = [
  "alloy-primitives 0.7.7",
  "bitvec",
@@ -4823,6 +4824,7 @@ dependencies = [
 [[package]]
 name = "ssz_rs_derive"
 version = "0.9.0"
+source = "git+https://github.com/willemolding/ssz-rs?rev=d351c06a1e47e7cfa2470c2571254bf44982064d#d351c06a1e47e7cfa2470c2571254bf44982064d"
 dependencies = [
  "proc-macro2",
  "quote",
