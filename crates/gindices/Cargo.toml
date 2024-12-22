@@ -1,0 +1,9 @@
+[package]
+name = "gindices"
+version = "0.1.0"
+edition = "2021"
+
+[dev-dependencies]
+ssz_rs.workspace = true
+ethereum-consensus.workspace = true
+anyhow.workspace = true

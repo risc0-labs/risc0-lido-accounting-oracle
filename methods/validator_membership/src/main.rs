@@ -1,9 +1,8 @@
 use bitvec::prelude::*;
-use lido_oracle_core::{
-    gindices::presets::mainnet::beacon_state as beacon_state_gindices,
-    io::validator_membership::{Input, Journal, ProofType},
-    WITHDRAWAL_CREDENTIALS,
-};
+use gindices::presets::mainnet::beacon_state as beacon_state_gindices;
+use guest_io::validator_membership::{Input, Journal, ProofType};
+use guest_io::WITHDRAWAL_CREDENTIALS;
+
 use risc0_zkvm::{guest::env, serde::to_vec};
 
 pub fn main() {

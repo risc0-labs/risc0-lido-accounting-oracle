@@ -1,8 +1,7 @@
 use alloy_primitives::B256;
-use lido_oracle_core::{
-    gindices::presets::mainnet::{beacon_block as beacon_block_gindices, beacon_state as beacon_state_gindices},
-    io::balance_and_exits::{Input, Journal},
-};
+use gindices::presets::mainnet::beacon_block as beacon_block_gindices;
+use gindices::presets::mainnet::beacon_state as beacon_state_gindices;
+use guest_io::balance_and_exits::{Input, Journal};
 use risc0_zkvm::guest::env;
 use tracing_subscriber::fmt::format::FmtSpan;
 

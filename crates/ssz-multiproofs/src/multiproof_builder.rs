@@ -205,7 +205,6 @@ mod gtests {
     #[test]
     fn test_gindex_iterator() {
         use super::*;
-        use bitvec::prelude::*;
 
         let descriptor = bitvec![u8, Msb0; 0,0,1,0,0,1,0,1,1,1,1];
         assert_eq!(
@@ -245,6 +244,7 @@ fn hash_pair(left: &Node, right: &Node) -> Node {
     Node::from_slice(hasher.finalize().as_slice())
 }
 
+#[cfg(feature = "builder")]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -327,40 +327,5 @@ mod tests {
         );
 
         test_roundtrip_serialization(&multiproof);
-    }
-
-    #[test]
-    fn building_for_membership() -> Result<()> {
-        let prior_up_to_validator_index = 0;
-        let up_to_validator_index = 1000;
-        let n_validators = 1000;
-
-        let mut beacon_state = BeaconState::default();
-
-        // add empty validators to the state
-        for _ in prior_up_to_validator_index..n_validators {
-            beacon_state.validators.push(Default::default());
-        }
-        let beacon_root = beacon_state.hash_tree_root()?;
-
-        let input = crate::io::validator_membership::Input::build_initial(
-            &ethereum_consensus::types::mainnet::BeaconState::Phase0(beacon_state),
-            up_to_validator_index,
-        )?;
-
-        input.multiproof.verify(&beacon_root)?;
-
-        let mut values = input.multiproof.values();
-        for validator_index in prior_up_to_validator_index..up_to_validator_index {
-            let expected_gindex =
-                crate::gindices::presets::mainnet::beacon_state::validator_withdrawal_credentials(
-                    validator_index,
-                );
-            let (gindex, _) = values
-                .next()
-                .expect("Missing withdrawal_credentials value in multiproof");
-            assert_eq!(gindex, expected_gindex);
-        }
-        Ok(())
     }
 }

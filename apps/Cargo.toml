@@ -4,7 +4,8 @@ version = { workspace = true }
 edition = { workspace = true }
 
 [dependencies]
-lido-oracle-core.workspace = true
+ssz-multiproofs.workspace = true
+guest-io = { workspace = true, features = ["builder"] }
 
 alloy = { workspace = true }
 alloy-primitives = { workspace = true }

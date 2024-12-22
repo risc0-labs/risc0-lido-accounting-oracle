@@ -106,7 +106,7 @@ async fn membership(
     prior_slot: Option<u64>,
     prior_max_validator_index: Option<u64>,
 ) -> Result<()> {
-    use lido_oracle_core::io::validator_membership::{Input, Journal};
+    use guest_io::validator_membership::{Input, Journal};
 
     let beacon_client = BeaconClient::new_with_cache(args.beacon_rpc_url, "./beacon-cache")?;
 
@@ -153,7 +153,7 @@ async fn membership(
 }
 
 async fn balance_and_exits(args: Args) -> Result<()> {
-    use lido_oracle_core::io::balance_and_exits::{Input, Journal};
+    use guest_io::balance_and_exits::{Input, Journal};
     use std::fs::File;
     use std::io::Write;
 

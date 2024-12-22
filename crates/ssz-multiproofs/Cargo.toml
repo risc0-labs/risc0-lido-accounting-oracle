@@ -1,10 +1,10 @@
 [package]
-name = "lido-oracle-core"
+name = "ssz-multiproofs"
 version = "0.1.0"
 edition = "2021"
 
 [features]
-default = ["builder"]
+default = []
 builder = ["dep:ssz_rs", "dep:ethereum-consensus", "dep:rayon", "dep:indicatif"]
 
 [dependencies]
@@ -13,14 +13,18 @@ sha2.workspace = true
 alloy-primitives.workspace = true
 risc0-zkvm.workspace = true
 bitvec.workspace = true
-ssz_rs = { workspace = true, optional = true }
-ethereum-consensus = { workspace = true, optional = true }
 thiserror = "2.0.6"
 tracing.workspace = true
+
+# Optional dependencies
+ssz_rs = { workspace = true, optional = true }
+ethereum-consensus = { workspace = true, optional = true }
 rayon = { version = "1.10.0", optional = true }
 indicatif = { version = "0.17.9", features = ["rayon"], optional = true }
 
+
 [dev-dependencies]
+gindices.workspace = true
 ethereum-consensus.workspace = true
 serde_json = "1.0.133"
 anyhow.workspace = true

@@ -17,7 +17,7 @@ alloy-primitives = { workspace = true }
 alloy-sol-types = { workspace = true }
 risc0-zkvm = { workspace = true, features = ["client"] }
 apps = { path = "../apps" }
-lido-oracle-core = { path = "../core" }
+guest-io.workspace = true
 bitvec = { workspace = true }
 ethereum-consensus = { workspace = true }
 anyhow = { workspace = true }

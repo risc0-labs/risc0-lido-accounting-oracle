@@ -1,16 +1,16 @@
 use alloy_primitives::B256;
 use bitvec::prelude::*;
 use risc0_zkvm::sha::Digest;
-
+use ssz_multiproofs::Multiproof;
 #[cfg(feature = "builder")]
 use {
-    crate::error::{Error, Result},
-    crate::gindices::presets::mainnet::{
-        beacon_block as beacon_block_gindices, beacon_state as beacon_state_gindices,
-    },
-    crate::{Multiproof, MultiproofBuilder},
+    crate::error::Result,
     ethereum_consensus::phase0::BeaconBlockHeader,
     ethereum_consensus::types::mainnet::BeaconState,
+    gindices::presets::mainnet::{
+        beacon_block as beacon_block_gindices, beacon_state as beacon_state_gindices,
+    },
+    ssz_multiproofs::MultiproofBuilder,
     ssz_rs::prelude::*,
 };
 
@@ -33,7 +33,7 @@ pub mod validator_membership {
         pub proof_type: ProofType,
 
         /// Merkle SSZ proof rooted in the beacon state
-        pub multiproof: crate::Multiproof,
+        pub multiproof: Multiproof,
     }
 
     #[cfg(feature = "builder")]
@@ -44,13 +44,12 @@ pub mod validator_membership {
         ) -> Result<Self> {
             let current_state_root = beacon_state.hash_tree_root()?;
 
-            let proof_builder = crate::MultiproofBuilder::new().with_gindices(
-                (0..up_to_validator_index).map(|i| {
+            let proof_builder =
+                MultiproofBuilder::new().with_gindices((0..up_to_validator_index).map(|i| {
                     beacon_state_gindices::validator_withdrawal_credentials(i)
                         .try_into()
                         .unwrap()
-                }),
-            );
+                }));
 
             let multiproof = build_with_versioned_state(proof_builder, beacon_state)?;
 
@@ -72,7 +71,7 @@ pub mod validator_membership {
             let current_state_root = beacon_state.hash_tree_root()?;
             let prior_slot = prior_beacon_state.slot();
 
-            let proof_builder = crate::MultiproofBuilder::new()
+            let proof_builder = MultiproofBuilder::new()
                 .with_gindex(beacon_state_gindices::state_roots(prior_slot).try_into()?)
                 .with_gindices(
                     (prior_up_to_validator_index..up_to_validator_index).map(|i| {
@@ -128,8 +127,6 @@ pub mod validator_membership {
 }
 
 pub mod balance_and_exits {
-    use bitvec::mem;
-
     use super::*;
 
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -141,10 +138,10 @@ pub mod balance_and_exits {
         pub membership: BitVec<u32, Lsb0>,
 
         /// Merkle SSZ proof rooted in the beacon block
-        pub block_multiproof: crate::Multiproof,
+        pub block_multiproof: Multiproof,
 
         /// Merkle SSZ proof rooted in the beacon state
-        pub state_multiproof: crate::Multiproof,
+        pub state_multiproof: Multiproof,
     }
 
     #[cfg(feature = "builder")]
@@ -162,11 +159,11 @@ pub mod balance_and_exits {
 
             println!("{} Lido validators detected", membership.count_ones());
 
-            let block_multiproof = crate::MultiproofBuilder::new()
+            let block_multiproof = MultiproofBuilder::new()
                 .with_gindex(beacon_block_gindices::state_root().try_into()?)
                 .build(block_header)?;
 
-            let state_multiproof_builder = crate::MultiproofBuilder::new()
+            let state_multiproof_builder = MultiproofBuilder::new()
                 .with_gindices(membership.iter_ones().map(|i| {
                     beacon_state_gindices::validator_balance(i as u64)
                         .try_into()
@@ -205,11 +202,10 @@ fn build_with_versioned_state(
     beacon_state: &BeaconState,
 ) -> Result<Multiproof> {
     match beacon_state {
-        BeaconState::Phase0(b) => builder.build(b),
-        BeaconState::Altair(b) => builder.build(b),
-        BeaconState::Bellatrix(b) => builder.build(b),
-        BeaconState::Capella(b) => builder.build(b),
-        BeaconState::Deneb(b) => builder.build(b),
-        _ => Err(Error::UnsupportedFork),
+        BeaconState::Phase0(b) => Ok(builder.build(b)?),
+        BeaconState::Altair(b) => Ok(builder.build(b)?),
+        BeaconState::Bellatrix(b) => Ok(builder.build(b)?),
+        BeaconState::Capella(b) => Ok(builder.build(b)?),
+        BeaconState::Deneb(b) => Ok(builder.build(b)?),
     }
 }

@@ -20,8 +20,8 @@ mod tests {
     use ethereum_consensus::deneb::Validator;
     use ethereum_consensus::phase0::presets::mainnet::{BeaconBlockHeader, BeaconState};
     use ethereum_consensus::ssz::prelude::*;
-    use lido_oracle_core::io::{balance_and_exits, validator_membership};
-    use lido_oracle_core::WITHDRAWAL_CREDENTIALS;
+    use guest_io::WITHDRAWAL_CREDENTIALS;
+    use guest_io::{balance_and_exits, validator_membership};
     use risc0_zkvm::{default_executor, ExecutorEnv};
 
     #[test]
