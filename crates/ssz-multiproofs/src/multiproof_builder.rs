@@ -300,23 +300,25 @@ fn calculate_compact_multi_merkle_root_iterative(
     nodes: &[Node],
     descriptor: &Descriptor,
 ) -> Result<Node> {
+    let mut hasher = Sha256::new();
     let mut stack = Vec::new();
     let mut node_index = 0;
     for bit in descriptor.iter() {
         if *bit {
             stack.push(TreeNode::Leaf(nodes[node_index]));
             node_index += 1;
-
             // reduce any leaf pairs on the stack until we can progress no further
             while stack.len() > 2
                 && stack[stack.len() - 1].is_leaf()
                 && stack[stack.len() - 2].is_leaf()
                 && stack[stack.len() - 3].is_internal()
             {
-                let right = stack.pop().unwrap().unwrap_leaf();
+                let right = stack.pop().unwrap().unwrap_leaf(); // these are safe unwraps as we just checked
                 let left = stack.pop().unwrap().unwrap_leaf();
+                hasher.update(left);
+                hasher.update(right);
                 stack.pop(); // pop the internal node and replace with the hashed children
-                stack.push(TreeNode::Leaf(hash_pair(&left, &right)));
+                stack.push(TreeNode::Leaf(Node::from_slice(&hasher.finalize_reset())));
             }
         } else {
             stack.push(TreeNode::Internal);
@@ -324,13 +326,6 @@ fn calculate_compact_multi_merkle_root_iterative(
     }
     assert_eq!(stack.len(), 1);
     Ok(stack.pop().unwrap().unwrap_leaf())
-}
-
-fn hash_pair(left: &Node, right: &Node) -> Node {
-    let mut hasher = Sha256::new();
-    hasher.update(left);
-    hasher.update(right);
-    Node::from_slice(hasher.finalize().as_slice())
 }
 
 #[cfg(feature = "builder")]
