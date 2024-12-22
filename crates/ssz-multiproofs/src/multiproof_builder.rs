@@ -274,25 +274,19 @@ impl<'a> Iterator for GIndexIterator<'a> {
     }
 }
 
-enum TreeNode {
-    Leaf(Node),
+enum TreeNode<'a> {
+    Leaf(&'a Node),
+    Computed(Node),
     Internal,
 }
 
-impl TreeNode {
-    fn is_leaf(&self) -> bool {
-        matches!(self, TreeNode::Leaf(_))
+impl<'a> TreeNode<'a> {
+    fn has_value(&self) -> bool {
+        matches!(self, TreeNode::Leaf(_)) || matches!(self, TreeNode::Computed(_))
     }
 
     fn is_internal(&self) -> bool {
         matches!(self, TreeNode::Internal)
-    }
-
-    fn unwrap_leaf(self) -> Node {
-        match self {
-            TreeNode::Leaf(node) => node,
-            _ => panic!("Expected leaf"),
-        }
     }
 }
 
@@ -302,35 +296,47 @@ fn calculate_compact_multi_merkle_root_iterative(
 ) -> Result<Node> {
     let mut stack = Vec::new();
     let mut node_index = 0;
+    let mut hasher = Sha256::new();
     for bit in descriptor.iter() {
         if *bit {
-            stack.push(TreeNode::Leaf(nodes[node_index]));
+            stack.push(TreeNode::Leaf(&nodes[node_index]));
             node_index += 1;
 
             // reduce any leaf pairs on the stack until we can progress no further
             while stack.len() > 2
-                && stack[stack.len() - 1].is_leaf()
-                && stack[stack.len() - 2].is_leaf()
+                && stack[stack.len() - 1].has_value()
+                && stack[stack.len() - 2].has_value()
                 && stack[stack.len() - 3].is_internal()
             {
-                let right = stack.pop().unwrap().unwrap_leaf(); // these unwraps are safe as we just checked
-                let left = stack.pop().unwrap().unwrap_leaf();
+                let right = stack.pop().unwrap();
+                let left = stack.pop().unwrap();
+
+                match left {
+                    TreeNode::Leaf(node) => hasher.update(node),
+                    TreeNode::Computed(node) => hasher.update(&node),
+                    _ => panic!("Expected leaf"),
+                }
+                match right {
+                    TreeNode::Leaf(node) => hasher.update(node),
+                    TreeNode::Computed(node) => hasher.update(&node),
+                    _ => panic!("Expected leaf"),
+                }
+
                 stack.pop(); // pop the internal node and replace with the hashed children
-                stack.push(TreeNode::Leaf(hash_pair(&left, &right)));
+                stack.push(TreeNode::Computed(Node::from_slice(
+                    &hasher.finalize_reset(),
+                )));
             }
         } else {
             stack.push(TreeNode::Internal);
         }
     }
     assert_eq!(stack.len(), 1);
-    Ok(stack.pop().unwrap().unwrap_leaf())
-}
-
-fn hash_pair(left: &Node, right: &Node) -> Node {
-    let mut hasher = Sha256::new();
-    hasher.update(left);
-    hasher.update(right);
-    Node::from_slice(hasher.finalize().as_slice())
+    Ok(match stack.pop().unwrap() {
+        TreeNode::Leaf(_) => panic!("root must be computed"),
+        TreeNode::Computed(node) => node,
+        _ => panic!("Expected leaf"),
+    })
 }
 
 #[cfg(feature = "builder")]

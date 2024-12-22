@@ -24,3 +24,8 @@ tracing = "0.1.41"
 # Placing this patch statement in the workspace Cargo.toml will add RISC Zero SHA-256 accelerator
 # support for all downstream usages of the `sha2` crate.
 sha2 = { git = "https://github.com/risc0/RustCrypto-hashes", tag = "sha2-v0.10.8-risczero.0" }
+
+[profile.release]
+codegen-units = 1
+lto = "fat"
+opt-level = 3
