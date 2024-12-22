@@ -183,7 +183,6 @@ impl<'a> GIndexIterator<'a> {
 impl<'a> Iterator for GIndexIterator<'a> {
     type Item = u64;
 
-    #[tracing::instrument(skip(self), fields(gindex = self.current_gindex))]
     fn next(&mut self) -> Option<Self::Item> {
         while self.descriptor_index < self.descriptor.len() {
             let bit = self.descriptor[self.descriptor_index];
