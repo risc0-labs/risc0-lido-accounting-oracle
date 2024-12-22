@@ -19,5 +19,6 @@ target/
 .DS_Store
 .idea
 *.bin
+*.pb
 
 beacon-cache/
