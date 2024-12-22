@@ -4,10 +4,11 @@ use sha2::{Digest, Sha256};
 #[cfg(feature = "builder")]
 use {
     indicatif::{ParallelProgressIterator, ProgressBar, ProgressIterator, ProgressStyle},
-    ssz_rs::compact_multiproofs,
+    rayon::prelude::*,
     ssz_rs::prelude::{GeneralizedIndex, GeneralizedIndexable, Path, Prove},
     ssz_rs::proofs::Prover,
     std::collections::BTreeSet,
+    std::collections::HashSet,
 };
 
 pub type Node = alloy_primitives::B256;
@@ -48,11 +49,9 @@ impl MultiproofBuilder {
     // build the multi-proof for a given container
     // the resulting multi-proof will be sorted by descending gindex in both the leaves and proof nodes
     pub fn build<T: Prove + Sync>(self, container: &T) -> Result<Multiproof> {
-        use rayon::prelude::*;
-
         let gindices = self.gindices.into_iter().collect::<Vec<_>>();
 
-        let proof_indices = compact_multiproofs::compute_proof_indices(&gindices);
+        let proof_indices = compute_proof_indices(&gindices);
 
         let tree = container.compute_tree()?;
 
@@ -82,7 +81,7 @@ impl MultiproofBuilder {
             .map(|index| gindices.contains(index))
             .collect();
 
-        let descriptor = compact_multiproofs::compute_proof_descriptor(&gindices)?;
+        let descriptor = compute_proof_descriptor(&gindices)?;
 
         Ok(Multiproof {
             nodes,
@@ -90,6 +89,92 @@ impl MultiproofBuilder {
             value_mask,
         })
     }
+}
+
+pub type Descriptor = BitVec<u8, Msb0>;
+
+#[cfg(feature = "builder")]
+pub fn compute_proof_indices(indices: &[GeneralizedIndex]) -> Vec<GeneralizedIndex> {
+    let mut indices_set: HashSet<GeneralizedIndex> = HashSet::new();
+    for &index in indices {
+        let helper_indices = get_helper_indices(&[index]);
+        for helper_index in helper_indices {
+            indices_set.insert(helper_index);
+        }
+    }
+    for &index in indices {
+        let path_indices = get_path_indices(index);
+        for path_index in path_indices {
+            indices_set.remove(&path_index);
+        }
+        indices_set.insert(index);
+    }
+    let mut sorted_indices: Vec<GeneralizedIndex> = indices_set.into_iter().collect();
+    sorted_indices.sort_by_key(|index| format!("{:b}", *index));
+    sorted_indices
+}
+
+#[cfg(feature = "builder")]
+pub fn compute_proof_descriptor(indices: &[GeneralizedIndex]) -> Result<Descriptor> {
+    let indices = compute_proof_indices(indices);
+    let mut descriptor = Descriptor::new();
+    for index in indices {
+        descriptor.extend(std::iter::repeat(false).take(index.trailing_zeros() as usize));
+        descriptor.push(true);
+    }
+    Ok(descriptor)
+}
+
+#[cfg(feature = "builder")]
+pub fn get_branch_indices(tree_index: GeneralizedIndex) -> Vec<GeneralizedIndex> {
+    let mut focus = sibling(tree_index);
+    let mut result = vec![focus];
+    while focus > 1 {
+        focus = sibling(parent(focus));
+        result.push(focus);
+    }
+    result.truncate(result.len() - 1);
+    result
+}
+
+#[cfg(feature = "builder")]
+pub fn get_path_indices(tree_index: GeneralizedIndex) -> Vec<GeneralizedIndex> {
+    let mut focus = tree_index;
+    let mut result = vec![focus];
+    while focus > 1 {
+        focus = parent(focus);
+        result.push(focus);
+    }
+    result.truncate(result.len() - 1);
+    result
+}
+
+#[cfg(feature = "builder")]
+pub fn get_helper_indices(indices: &[GeneralizedIndex]) -> Vec<GeneralizedIndex> {
+    let mut all_helper_indices = HashSet::new();
+    let mut all_path_indices = HashSet::new();
+
+    for index in indices {
+        all_helper_indices.extend(get_branch_indices(*index).iter());
+        all_path_indices.extend(get_path_indices(*index).iter());
+    }
+
+    let mut all_branch_indices = all_helper_indices
+        .difference(&all_path_indices)
+        .cloned()
+        .collect::<Vec<_>>();
+    all_branch_indices.sort_by(|a: &GeneralizedIndex, b: &GeneralizedIndex| b.cmp(a));
+    all_branch_indices
+}
+
+#[cfg(feature = "builder")]
+pub const fn sibling(index: GeneralizedIndex) -> GeneralizedIndex {
+    index ^ 1
+}
+
+#[cfg(feature = "builder")]
+pub const fn parent(index: GeneralizedIndex) -> GeneralizedIndex {
+    index / 2
 }
 
 /// An abstraction around a SSZ merkle multi-proof
@@ -163,14 +248,14 @@ impl Multiproof {
 
 /// Given a descriptor iterate over the gindices it describes
 struct GIndexIterator<'a> {
-    descriptor: &'a BitVec<u8, Msb0>,
+    descriptor: &'a Descriptor,
     descriptor_index: usize,
     current_gindex: u64,
     stack: Vec<u64>, // Stack to simulate the traversal
 }
 
 impl<'a> GIndexIterator<'a> {
-    fn new(descriptor: &'a BitVec<u8, Msb0>) -> Self {
+    fn new(descriptor: &'a Descriptor) -> Self {
         GIndexIterator {
             descriptor,
             descriptor_index: 0,
@@ -221,7 +306,7 @@ struct Pointer {
 
 fn calculate_compact_multi_merkle_root_inner(
     nodes: &[Node],
-    descriptor: &BitVec<u8, Msb0>,
+    descriptor: &Descriptor,
     ptr: &mut Pointer,
 ) -> Result<Node> {
     let bit = descriptor[ptr.bit_index];
