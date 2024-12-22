@@ -781,9 +781,9 @@ dependencies = [
  "clap",
  "ethereum-consensus",
  "guest-io",
+ "guests",
  "http-cache-reqwest",
  "log",
- "methods",
  "reqwest 0.12.9",
  "reqwest-cache",
  "reqwest-middleware 0.4.0",
@@ -2319,6 +2319,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "guests"
+version = "0.1.0"
+dependencies = [
+ "alloy-primitives 0.7.7",
+ "alloy-sol-types 0.7.7",
+ "anyhow",
+ "apps",
+ "bitvec",
+ "ethereum-consensus",
+ "guest-io",
+ "hex",
+ "risc0-build",
+ "risc0-build-ethereum",
+ "risc0-zkp",
+ "risc0-zkvm",
+]
+
+[[package]]
 name = "h2"
 version = "0.3.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3128,24 +3146,6 @@ dependencies = [
  "log",
  "objc",
  "paste",
-]
-
-[[package]]
-name = "methods"
-version = "0.1.0"
-dependencies = [
- "alloy-primitives 0.7.7",
- "alloy-sol-types 0.7.7",
- "anyhow",
- "apps",
- "bitvec",
- "ethereum-consensus",
- "guest-io",
- "hex",
- "risc0-build",
- "risc0-build-ethereum",
- "risc0-zkp",
- "risc0-zkvm",
 ]
 
 [[package]]

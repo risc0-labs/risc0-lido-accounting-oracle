@@ -1,9 +1,9 @@
 {
     "rust-analyzer.linkedProjects": [
         "./apps/Cargo.toml",
-        "./methods/Cargo.toml",
-        "./methods/validator_membership/Cargo.toml",
-        "./methods/balance_and_exits/Cargo.toml",
+        "./guests/Cargo.toml",
+        "./guests/validator_membership/Cargo.toml",
+        "./guests/balance_and_exits/Cargo.toml",
 
     ],
     "rust-analyzer.check.extraEnv": {

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["apps", "methods", "crates/ssz-multiproofs", "crates/gindices", "crates/guest-io"]
+members = ["apps", "guests", "crates/ssz-multiproofs", "crates/gindices", "crates/guest-io"]
 exclude = ["lib"]
 
 [workspace.package]
@@ -11,6 +11,7 @@ edition = "2021"
 gindices.path = "./crates/gindices"
 ssz-multiproofs.path = "./crates/ssz-multiproofs"
 guest-io.path = "./crates/guest-io"
+guests.path = "./guests"
 
 alloy = { version = "0.6", features = ["full"] }
 alloy-primitives = { version = "0.7", default-features = false, features = ["rlp", "serde", "std"] }

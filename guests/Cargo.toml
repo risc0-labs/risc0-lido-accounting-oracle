@@ -1,5 +1,5 @@
 [package]
-name = "methods"
+name = "guests"
 version = { workspace = true }
 edition = { workspace = true }
 

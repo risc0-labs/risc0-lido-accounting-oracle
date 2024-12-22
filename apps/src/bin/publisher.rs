@@ -21,7 +21,7 @@ use anyhow::{Context, Result};
 use apps::beacon_client::BeaconClient;
 use clap::Parser;
 use ethereum_consensus::{ssz::prelude::Path, types::mainnet::BeaconState};
-use methods::{BALANCE_AND_EXITS_ELF, VALIDATOR_MEMBERSHIP_ELF};
+use guests::{BALANCE_AND_EXITS_ELF, VALIDATOR_MEMBERSHIP_ELF};
 use risc0_ethereum_contracts::encode_seal;
 use risc0_zkvm::{
     default_executor,
