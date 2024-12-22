@@ -12,6 +12,9 @@ pub enum Error {
 
     #[error("Attempted to verify an invalid merkle multiproof")]
     InvalidProof,
+
+    #[error("Root calculated by proof does not match expected root")]
+    RootMismatch,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

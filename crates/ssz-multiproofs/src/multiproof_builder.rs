@@ -12,6 +12,7 @@ use {
 };
 
 pub type Node = alloy_primitives::B256;
+pub type Descriptor = BitVec<u8, Msb0>;
 
 #[cfg(feature = "builder")]
 #[derive(Debug)]
@@ -91,10 +92,8 @@ impl MultiproofBuilder {
     }
 }
 
-pub type Descriptor = BitVec<u8, Msb0>;
-
 #[cfg(feature = "builder")]
-pub fn compute_proof_indices(indices: &[GeneralizedIndex]) -> Vec<GeneralizedIndex> {
+fn compute_proof_indices(indices: &[GeneralizedIndex]) -> Vec<GeneralizedIndex> {
     let mut indices_set: HashSet<GeneralizedIndex> = HashSet::new();
     for &index in indices {
         let helper_indices = get_helper_indices(&[index]);
@@ -115,7 +114,7 @@ pub fn compute_proof_indices(indices: &[GeneralizedIndex]) -> Vec<GeneralizedInd
 }
 
 #[cfg(feature = "builder")]
-pub fn compute_proof_descriptor(indices: &[GeneralizedIndex]) -> Result<Descriptor> {
+fn compute_proof_descriptor(indices: &[GeneralizedIndex]) -> Result<Descriptor> {
     let indices = compute_proof_indices(indices);
     let mut descriptor = Descriptor::new();
     for index in indices {
@@ -126,7 +125,7 @@ pub fn compute_proof_descriptor(indices: &[GeneralizedIndex]) -> Result<Descript
 }
 
 #[cfg(feature = "builder")]
-pub fn get_branch_indices(tree_index: GeneralizedIndex) -> Vec<GeneralizedIndex> {
+fn get_branch_indices(tree_index: GeneralizedIndex) -> Vec<GeneralizedIndex> {
     let mut focus = sibling(tree_index);
     let mut result = vec![focus];
     while focus > 1 {
@@ -138,7 +137,7 @@ pub fn get_branch_indices(tree_index: GeneralizedIndex) -> Vec<GeneralizedIndex>
 }
 
 #[cfg(feature = "builder")]
-pub fn get_path_indices(tree_index: GeneralizedIndex) -> Vec<GeneralizedIndex> {
+fn get_path_indices(tree_index: GeneralizedIndex) -> Vec<GeneralizedIndex> {
     let mut focus = tree_index;
     let mut result = vec![focus];
     while focus > 1 {
@@ -150,7 +149,7 @@ pub fn get_path_indices(tree_index: GeneralizedIndex) -> Vec<GeneralizedIndex> {
 }
 
 #[cfg(feature = "builder")]
-pub fn get_helper_indices(indices: &[GeneralizedIndex]) -> Vec<GeneralizedIndex> {
+fn get_helper_indices(indices: &[GeneralizedIndex]) -> Vec<GeneralizedIndex> {
     let mut all_helper_indices = HashSet::new();
     let mut all_path_indices = HashSet::new();
 
@@ -168,12 +167,12 @@ pub fn get_helper_indices(indices: &[GeneralizedIndex]) -> Vec<GeneralizedIndex>
 }
 
 #[cfg(feature = "builder")]
-pub const fn sibling(index: GeneralizedIndex) -> GeneralizedIndex {
+const fn sibling(index: GeneralizedIndex) -> GeneralizedIndex {
     index ^ 1
 }
 
 #[cfg(feature = "builder")]
-pub const fn parent(index: GeneralizedIndex) -> GeneralizedIndex {
+const fn parent(index: GeneralizedIndex) -> GeneralizedIndex {
     index / 2
 }
 
@@ -204,22 +203,12 @@ impl Multiproof {
         if self.calculate_root()? == *root {
             Ok(())
         } else {
-            Err(Error::InvalidProof)
+            Err(Error::RootMismatch)
         }
     }
 
     pub fn calculate_root(&self) -> Result<Node> {
-        let mut ptr = Pointer {
-            bit_index: 0,
-            node_index: 0,
-        };
-        let root =
-            calculate_compact_multi_merkle_root_inner(&self.nodes, &self.descriptor, &mut ptr)?;
-        if ptr.bit_index != self.descriptor.len() || ptr.node_index != self.nodes.len() {
-            Err(Error::InvalidProof)
-        } else {
-            Ok(root)
-        }
+        calculate_compact_multi_merkle_root_iterative(&self.nodes, &self.descriptor)
     }
 
     /// Creates an iterator the nodes in this proof along with their gindices
@@ -285,41 +274,56 @@ impl<'a> Iterator for GIndexIterator<'a> {
     }
 }
 
-#[cfg(test)]
-mod gtests {
-    #[test]
-    fn test_gindex_iterator() {
-        use super::*;
+enum TreeNode {
+    Leaf(Node),
+    Internal,
+}
 
-        let descriptor = bitvec![u8, Msb0; 0,0,1,0,0,1,0,1,1,1,1];
-        assert_eq!(
-            GIndexIterator::new(&descriptor).collect::<Vec<u64>>(),
-            vec![4, 20, 42, 43, 11, 3]
-        );
+impl TreeNode {
+    fn is_leaf(&self) -> bool {
+        matches!(self, TreeNode::Leaf(_))
+    }
+
+    fn is_internal(&self) -> bool {
+        matches!(self, TreeNode::Internal)
+    }
+
+    fn unwrap_leaf(self) -> Node {
+        match self {
+            TreeNode::Leaf(node) => node,
+            _ => panic!("Expected leaf"),
+        }
     }
 }
 
-struct Pointer {
-    bit_index: usize,
-    node_index: usize,
-}
-
-fn calculate_compact_multi_merkle_root_inner(
+fn calculate_compact_multi_merkle_root_iterative(
     nodes: &[Node],
     descriptor: &Descriptor,
-    ptr: &mut Pointer,
 ) -> Result<Node> {
-    let bit = descriptor[ptr.bit_index];
-    ptr.bit_index += 1;
-    if bit {
-        let node = nodes[ptr.node_index];
-        ptr.node_index += 1;
-        Ok(node)
-    } else {
-        let left = calculate_compact_multi_merkle_root_inner(nodes, descriptor, ptr)?;
-        let right = calculate_compact_multi_merkle_root_inner(nodes, descriptor, ptr)?;
-        Ok(hash_pair(&left, &right))
+    let mut stack = Vec::new();
+    let mut node_index = 0;
+    for bit in descriptor.iter() {
+        if *bit {
+            stack.push(TreeNode::Leaf(nodes[node_index]));
+            node_index += 1;
+
+            // reduce any leaf pairs on the stack until we can progress no further
+            while stack.len() > 2
+                && stack[stack.len() - 1].is_leaf()
+                && stack[stack.len() - 2].is_leaf()
+                && stack[stack.len() - 3].is_internal()
+            {
+                let right = stack.pop().unwrap().unwrap_leaf();
+                let left = stack.pop().unwrap().unwrap_leaf();
+                stack.pop(); // pop the internal node and replace with the hashed children
+                stack.push(TreeNode::Leaf(hash_pair(&left, &right)));
+            }
+        } else {
+            stack.push(TreeNode::Internal);
+        }
     }
+    assert_eq!(stack.len(), 1);
+    Ok(stack.pop().unwrap().unwrap_leaf())
 }
 
 fn hash_pair(left: &Node, right: &Node) -> Node {
@@ -336,6 +340,17 @@ mod tests {
     use ethereum_consensus::phase0::presets::mainnet::BeaconState;
     use risc0_zkvm::serde::{from_slice, to_vec};
     use ssz_rs::prelude::*;
+
+    #[test]
+    fn test_gindex_iterator() {
+        use super::*;
+
+        let descriptor = bitvec![u8, Msb0; 0,0,1,0,0,1,0,1,1,1,1];
+        assert_eq!(
+            GIndexIterator::new(&descriptor).collect::<Vec<u64>>(),
+            vec![4, 20, 42, 43, 11, 3]
+        );
+    }
 
     fn test_roundtrip_serialization(multiproof: &Multiproof) {
         let serialized = to_vec(multiproof).unwrap();
