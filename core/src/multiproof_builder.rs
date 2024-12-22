@@ -1,9 +1,9 @@
 use crate::error::{Error, Result};
 use bitvec::prelude::*;
-use serde::de::value;
 use sha2::{Digest, Sha256};
 #[cfg(feature = "builder")]
 use {
+    indicatif::{ParallelProgressIterator, ProgressBar, ProgressIterator, ProgressStyle},
     ssz_rs::compact_multiproofs,
     ssz_rs::prelude::{GeneralizedIndex, GeneralizedIndexable, Path, Prove},
     ssz_rs::proofs::Prover,
@@ -48,33 +48,46 @@ impl MultiproofBuilder {
     // build the multi-proof for a given container
     // the resulting multi-proof will be sorted by descending gindex in both the leaves and proof nodes
     pub fn build<T: Prove + Sync>(self, container: &T) -> Result<Multiproof> {
+        use rayon::prelude::*;
+
         let gindices = self.gindices.into_iter().collect::<Vec<_>>();
 
         let proof_indices = compact_multiproofs::compute_proof_indices(&gindices);
 
         let tree = container.compute_tree()?;
-        let mut value_indices = Vec::new();
+
+        // Provide a custom bar style
+        let pb = ProgressBar::new(proof_indices.len() as u64);
+        pb.set_style(
+            ProgressStyle::with_template(
+                "{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] ({pos}/{len}, ETA {eta})",
+            )
+            .unwrap(),
+        );
 
         let nodes: Vec<_> = proof_indices
-            .iter() // TODO: parallelize
-            .enumerate()
-            .map(|(i, index)| {
+            .par_iter()
+            .progress_with(pb.clone())
+            .map(|index| {
                 let mut prover = Prover::from(*index);
                 prover.compute_proof_cached_tree(container, &tree)?;
                 let proof = prover.into_proof();
-                if gindices.contains(&proof.index) {
-                    value_indices.push(i);
-                }
                 Ok(proof.leaf)
             })
             .collect::<Result<Vec<_>>>()?;
+
+        let value_mask = proof_indices
+            .iter()
+            .progress_with(pb)
+            .map(|index| gindices.contains(index))
+            .collect();
 
         let descriptor = compact_multiproofs::compute_proof_descriptor(&gindices)?;
 
         Ok(Multiproof {
             nodes,
             descriptor,
-            value_indices,
+            value_mask,
         })
     }
 }
@@ -92,8 +105,8 @@ pub struct Multiproof {
     /// The merkle tree nodes corresponding to both leaves and internal proof nodes
     nodes: Vec<Node>,
 
-    /// Indices into the nodes vector that correspond to the leaf values of interest
-    value_indices: Vec<usize>,
+    /// mask indicatign which nodes are values (1) or proof supporting nodes (0)
+    value_mask: BitVec<u8, Msb0>,
 
     /// bitvector describing the shape of the proof
     descriptor: BitVec<u8, Msb0>,
@@ -101,6 +114,7 @@ pub struct Multiproof {
 
 impl Multiproof {
     /// Verify this multi-proof against a given root
+    #[tracing::instrument(skip(self))]
     pub fn verify(&self, root: &Node) -> Result<()> {
         if self.calculate_root()? == *root {
             Ok(())
@@ -130,13 +144,9 @@ impl Multiproof {
 
     /// Creates an iterator the values in this proof along with their gindices
     pub fn values(&self) -> impl Iterator<Item = (u64, &Node)> {
-        self.nodes().enumerate().filter_map(|(i, node)| {
-            if self.value_indices.contains(&i) {
-                Some(node)
-            } else {
-                None
-            }
-        })
+        self.nodes()
+            .zip(self.value_mask.iter())
+            .filter_map(|(node, is_value)| if *is_value { Some(node) } else { None })
     }
 
     /// Finds the node corresponding to a given gindex.
@@ -173,6 +183,7 @@ impl<'a> GIndexIterator<'a> {
 impl<'a> Iterator for GIndexIterator<'a> {
     type Item = u64;
 
+    #[tracing::instrument(skip(self), fields(gindex = self.current_gindex))]
     fn next(&mut self) -> Option<Self::Item> {
         while self.descriptor_index < self.descriptor.len() {
             let bit = self.descriptor[self.descriptor_index];

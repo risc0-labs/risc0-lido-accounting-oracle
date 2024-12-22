@@ -20,10 +20,15 @@ use alloy_primitives::{Address, U256};
 use anyhow::{Context, Result};
 use apps::beacon_client::BeaconClient;
 use clap::Parser;
-use ethereum_consensus::types::mainnet::BeaconState;
+use ethereum_consensus::{ssz::prelude::Path, types::mainnet::BeaconState};
 use methods::{BALANCE_AND_EXITS_ELF, VALIDATOR_MEMBERSHIP_ELF};
 use risc0_ethereum_contracts::encode_seal;
-use risc0_zkvm::{default_executor, serde::to_vec, ExecutorEnv, ProverOpts, VerifierContext};
+use risc0_zkvm::{
+    default_executor,
+    serde::{from_slice, to_vec},
+    ExecutorEnv, ProverOpts, VerifierContext,
+};
+use std::path::PathBuf;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 use url::Url;
 
@@ -38,6 +43,9 @@ struct Args {
     /// slot at which to generate an oracle proof for
     #[clap(long)]
     slot: u64,
+
+    #[clap(long)]
+    input_data: Option<PathBuf>,
 
     #[clap(subcommand)]
     command: Command,
@@ -149,24 +157,32 @@ async fn balance_and_exits(args: Args) -> Result<()> {
     use std::fs::File;
     use std::io::Write;
 
-    let beacon_client = BeaconClient::new_with_cache(args.beacon_rpc_url, "./beacon-cache")?;
-    let beacon_block_header = beacon_client.get_block_header(args.slot).await?;
+    let input = if let Some(input_data) = args.input_data {
+        tracing::info!("Reading input data from file: {:?}", input_data);
+        let input_data = std::fs::read(input_data)?;
+        let input: Input = from_slice(&input_data)?;
+        input
+    } else {
+        let beacon_client = BeaconClient::new_with_cache(args.beacon_rpc_url, "./beacon-cache")?;
+        let beacon_block_header = beacon_client.get_block_header(args.slot).await?;
 
-    tracing::info!("Fetched beacon block: {:?}", beacon_block_header);
+        tracing::info!(
+            "Fetching (or retrieving cached) beacon state at slot {}",
+            args.slot
+        );
+        let beacon_state = beacon_client.get_state(args.slot).await?;
 
-    tracing::info!(
-        "Fetching (or retrieving cached) beacon state at slot {}",
-        args.slot
-    );
-    let beacon_state = beacon_client.get_state(args.slot).await?;
+        tracing::info!("Fetched beacon state");
 
-    tracing::info!("Building input");
-    let input = Input::build(&beacon_block_header.message, &beacon_state)?;
+        tracing::info!("Building input");
+        let input = Input::build(&beacon_block_header.message, &beacon_state)?;
 
-    // serialize input and write it to file
-    let serialized_input = to_vec(&input)?;
-    let mut file = File::create(format!("input_data_slot_{}.bin", args.slot))?;
-    file.write_all(&bytemuck::cast_slice(&serialized_input))?;
+        // serialize input and write it to file
+        let serialized_input = to_vec(&input)?;
+        let mut file = File::create(format!("input_data_slot_{}.bin", args.slot))?;
+        file.write_all(&bytemuck::cast_slice(&serialized_input))?;
+        input
+    };
 
     let env = ExecutorEnv::builder().write(&input)?.build()?;
 
