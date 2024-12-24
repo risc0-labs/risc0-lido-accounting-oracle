@@ -9,6 +9,7 @@ use {
     ssz_rs::proofs::Prover,
     std::collections::BTreeSet,
     std::collections::HashSet,
+    tracing_indicatif::suspend_tracing_indicatif,
 };
 
 pub type Node = alloy_primitives::B256;
@@ -49,6 +50,7 @@ impl MultiproofBuilder {
 
     // build the multi-proof for a given container
     // the resulting multi-proof will be sorted by descending gindex in both the leaves and proof nodes
+    #[tracing::instrument(skip(self, container))]
     pub fn build<T: Prove + Sync>(self, container: &T) -> Result<Multiproof> {
         let gindices = self.gindices.into_iter().collect::<Vec<_>>();
 
@@ -56,31 +58,38 @@ impl MultiproofBuilder {
 
         let tree = container.compute_tree()?;
 
-        // Provide a custom bar style
+        let pb_style = ProgressStyle::with_template(
+            "{msg} {spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] ({pos}/{len}, ETA {eta})",
+        )
+        .unwrap();
         let pb = ProgressBar::new(proof_indices.len() as u64);
-        pb.set_style(
-            ProgressStyle::with_template(
-                "{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] ({pos}/{len}, ETA {eta})",
-            )
-            .unwrap(),
-        );
+        pb.set_message("Building Merkle multiproof for request values");
+        pb.set_style(pb_style.clone());
 
-        let nodes: Vec<_> = proof_indices
-            .par_iter()
-            .progress_with(pb.clone())
-            .map(|index| {
-                let mut prover = Prover::from(*index);
-                prover.compute_proof_cached_tree(container, &tree)?;
-                let proof = prover.into_proof();
-                Ok(proof.leaf)
-            })
-            .collect::<Result<Vec<_>>>()?;
+        let nodes: Vec<_> = suspend_tracing_indicatif(|| {
+            proof_indices
+                .par_iter()
+                .progress_with(pb.clone())
+                .map(|index| {
+                    let mut prover = Prover::from(*index);
+                    prover.compute_proof_cached_tree(container, &tree)?;
+                    let proof = prover.into_proof();
+                    Ok(proof.leaf)
+                })
+                .collect::<Result<Vec<_>>>()
+        })?;
 
-        let value_mask = proof_indices
-            .iter()
-            .progress_with(pb)
-            .map(|index| gindices.contains(index))
-            .collect();
+        let pb = ProgressBar::new(proof_indices.len() as u64);
+        pb.set_message("Marking values in multiproof");
+        pb.set_style(pb_style);
+
+        let value_mask = suspend_tracing_indicatif(|| {
+            proof_indices
+                .iter()
+                .progress_with(pb)
+                .map(|index| gindices.contains(index))
+                .collect()
+        });
 
         let descriptor = compute_proof_descriptor(&gindices)?;
 

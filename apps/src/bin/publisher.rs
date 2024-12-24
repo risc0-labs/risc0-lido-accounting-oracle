@@ -26,6 +26,11 @@ use risc0_zkvm::{
     ExecutorEnv, ProverOpts, VerifierContext,
 };
 use std::path::PathBuf;
+use tracing::instrument::WithSubscriber;
+use tracing_indicatif::span_ext::IndicatifSpanExt;
+use tracing_indicatif::IndicatifLayer;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{
     fmt::{self, format::FmtSpan},
     EnvFilter,
@@ -37,7 +42,7 @@ use url::Url;
 #[clap(author, version, about, long_about = None)]
 struct Args {
     /// Ethereum beacon node HTTP RPC endpoint.
-    #[clap(long)]
+    #[clap(long, env)]
     beacon_rpc_url: Url,
 
     /// slot at which to generate an oracle proof for
@@ -71,14 +76,17 @@ enum Command {
         #[clap(long)]
         prior_max_validator_index: Option<u64>,
     },
+    /// Produce the final oracle proof to go on-chain
     Finalize,
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    tracing_subscriber::fmt()
-        .with_span_events(FmtSpan::ENTER | FmtSpan::EXIT)
-        .with_env_filter(EnvFilter::from_default_env())
+    let indicatif_layer = IndicatifLayer::new();
+    tracing_subscriber::registry()
+        .with(EnvFilter::from_default_env())
+        .with(tracing_subscriber::fmt::layer().with_writer(indicatif_layer.get_stderr_writer()))
+        .with(indicatif_layer)
         .init();
 
     let args = Args::parse();
@@ -89,7 +97,7 @@ async fn main() -> Result<()> {
             prior_slot,
             prior_max_validator_index,
         } => {
-            membership(
+            build_membership_proof(
                 args,
                 max_validator_index,
                 prior_slot,
@@ -97,13 +105,14 @@ async fn main() -> Result<()> {
             )
             .await?
         }
-        Command::Finalize => balance_and_exits(args).await?,
+        Command::Finalize => build_oracle_proof(args).await?,
     }
 
     Ok(())
 }
 
-async fn membership(
+#[tracing::instrument(skip(args, max_validator_index, prior_slot, prior_max_validator_index))]
+async fn build_membership_proof(
     args: Args,
     max_validator_index: Option<u64>,
     prior_slot: Option<u64>,
@@ -112,22 +121,16 @@ async fn membership(
     use guest_io::validator_membership::{Input, Journal};
 
     let beacon_client = BeaconClient::new_with_cache(args.beacon_rpc_url, "./beacon-cache")?;
+    let beacon_state = beacon_client.get_beacon_state(args.slot).await?;
 
-    tracing::info!(
-        "Fetching (or retrieving cached) beacon state at slot {}",
-        args.slot
-    );
-    let beacon_state = beacon_client.get_state(args.slot).await?;
-    tracing::info!("Fetched beacon state");
     tracing::info!("Total validators: {}", beacon_state.validators().len());
+
     let max_validator_index = max_validator_index.unwrap_or(beacon_state.validators().len() as u64);
 
     let input = if let (Some(prior_slot), Some(prior_max_validator_index)) =
         (prior_slot, prior_max_validator_index)
     {
-        tracing::info!("Building input for continuation proof");
-
-        let prior_beacon_state = beacon_client.get_state(prior_slot).await?;
+        let prior_beacon_state = beacon_client.get_beacon_state(prior_slot).await?;
         Input::build_continuation(
             &prior_beacon_state,
             prior_max_validator_index,
@@ -135,16 +138,12 @@ async fn membership(
             max_validator_index,
         )?
     } else {
-        tracing::info!("Building input for initial proof");
         Input::build_initial(&beacon_state, max_validator_index)?
     };
 
-    tracing::debug!("Input: {:?}", input);
     tracing::debug!("input size (bytes): {}", to_vec(&input)?.len() * 4);
 
     let env = ExecutorEnv::builder().write(&input)?.build()?;
-
-    tracing::info!("Starting execution of the program");
     let session_info = default_executor().execute(env, VALIDATOR_MEMBERSHIP_ELF)?;
     tracing::debug!(
         "program execution returned: {:?}",
@@ -152,12 +151,11 @@ async fn membership(
     );
     tracing::info!("total cycles: {}", session_info.cycles());
 
-    tracing::info!("Complete");
-
     Ok(())
 }
 
-async fn balance_and_exits(args: Args) -> Result<()> {
+#[tracing::instrument(skip(args))]
+async fn build_oracle_proof(args: Args) -> Result<()> {
     use guest_io::balance_and_exits::{Input, Journal};
     use std::fs::File;
     use std::io::Write;
@@ -171,15 +169,7 @@ async fn balance_and_exits(args: Args) -> Result<()> {
         let beacon_client = BeaconClient::new_with_cache(args.beacon_rpc_url, "./beacon-cache")?;
         let beacon_block_header = beacon_client.get_block_header(args.slot).await?;
 
-        tracing::info!(
-            "Fetching (or retrieving cached) beacon state at slot {}",
-            args.slot
-        );
-        let beacon_state = beacon_client.get_state(args.slot).await?;
-
-        tracing::info!("Fetched beacon state");
-
-        tracing::info!("Building input");
+        let beacon_state = beacon_client.get_beacon_state(args.slot).await?;
         let input = Input::build(&beacon_block_header.message, &beacon_state)?;
 
         // serialize input and write it to file
@@ -191,15 +181,12 @@ async fn balance_and_exits(args: Args) -> Result<()> {
 
     let env = ExecutorEnv::builder().write(&input)?.build()?;
 
-    tracing::info!("Starting execution of the program");
     let session_info = default_executor().execute(env, BALANCE_AND_EXITS_ELF)?;
     tracing::debug!(
         "program execution returned: {:?}",
         session_info.journal.decode::<Journal>()?
     );
     tracing::info!("total cycles: {}", session_info.cycles());
-
-    tracing::info!("Complete");
 
     Ok(())
 }

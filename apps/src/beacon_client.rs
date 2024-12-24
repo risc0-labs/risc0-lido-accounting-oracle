@@ -88,6 +88,7 @@ impl BeaconClient {
     }
 
     /// Retrieves block details for given block id.
+    #[tracing::instrument(skip(self), fields(block_id = %block_id))]
     pub async fn get_block_header(
         &self,
         block_id: impl Display,
@@ -97,7 +98,8 @@ impl BeaconClient {
         Ok(result.data.header)
     }
 
-    pub async fn get_state(&self, state_id: impl Display) -> Result<BeaconState, Error> {
+    #[tracing::instrument(skip(self), fields(state_id = %state_id))]
+    pub async fn get_beacon_state(&self, state_id: impl Display) -> Result<BeaconState, Error> {
         let path = format!("eth/v2/debug/beacon/states/{state_id}");
         let result: VersionedResponse<BeaconState> = self.http_get(&path).await?;
         if result.version.to_string() != result.inner.data.version().to_string() {

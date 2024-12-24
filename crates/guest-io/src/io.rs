@@ -38,6 +38,7 @@ pub mod validator_membership {
 
     #[cfg(feature = "builder")]
     impl Input {
+        #[tracing::instrument(skip(beacon_state, up_to_validator_index))]
         pub fn build_initial(
             beacon_state: &BeaconState,
             up_to_validator_index: u64,
@@ -62,6 +63,12 @@ pub mod validator_membership {
             })
         }
 
+        #[tracing::instrument(skip(
+            prior_beacon_state,
+            prior_up_to_validator_index,
+            beacon_state,
+            up_to_validator_index
+        ))]
         pub fn build_continuation(
             prior_beacon_state: &BeaconState,
             prior_up_to_validator_index: u64,
@@ -146,6 +153,7 @@ pub mod balance_and_exits {
 
     #[cfg(feature = "builder")]
     impl Input {
+        #[tracing::instrument(skip(block_header, beacon_state))]
         pub fn build(block_header: &BeaconBlockHeader, beacon_state: &BeaconState) -> Result<Self> {
             let block_root = block_header.hash_tree_root()?;
 
@@ -157,7 +165,7 @@ pub mod balance_and_exits {
                 })
                 .collect::<BitVec<u32, Lsb0>>();
 
-            println!("{} Lido validators detected", membership.count_ones());
+            tracing::info!("{} Lido validators detected", membership.count_ones());
 
             let block_multiproof = MultiproofBuilder::new()
                 .with_gindex(beacon_block_gindices::state_root().try_into()?)
