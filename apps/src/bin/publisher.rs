@@ -26,7 +26,10 @@ use risc0_zkvm::{
     ExecutorEnv, ProverOpts, VerifierContext,
 };
 use std::path::PathBuf;
-use tracing_subscriber::fmt::{self, format::FmtSpan};
+use tracing_subscriber::{
+    fmt::{self, format::FmtSpan},
+    EnvFilter,
+};
 use url::Url;
 
 /// Arguments of the publisher CLI.
@@ -53,8 +56,11 @@ struct Args {
 enum Command {
     /// Generate or update a membership proof
     Update {
+        /// The top validator index the membership proof will be extended to
+        /// if not included it will prove up to the total number of validators
+        /// in the beacon state at the given slot
         #[clap(long)]
-        max_validator_index: u64,
+        max_validator_index: Option<u64>,
 
         /// The slot used previously if this is a continuation
         /// proof, otherwise None if this is the first proof
@@ -72,6 +78,7 @@ enum Command {
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_span_events(FmtSpan::ENTER | FmtSpan::EXIT)
+        .with_env_filter(EnvFilter::from_default_env())
         .init();
 
     let args = Args::parse();
@@ -98,7 +105,7 @@ async fn main() -> Result<()> {
 
 async fn membership(
     args: Args,
-    max_validator_index: u64,
+    max_validator_index: Option<u64>,
     prior_slot: Option<u64>,
     prior_max_validator_index: Option<u64>,
 ) -> Result<()> {
@@ -112,6 +119,8 @@ async fn membership(
     );
     let beacon_state = beacon_client.get_state(args.slot).await?;
     tracing::info!("Fetched beacon state");
+    tracing::info!("Total validators: {}", beacon_state.validators().len());
+    let max_validator_index = max_validator_index.unwrap_or(beacon_state.validators().len() as u64);
 
     let input = if let (Some(prior_slot), Some(prior_max_validator_index)) =
         (prior_slot, prior_max_validator_index)
