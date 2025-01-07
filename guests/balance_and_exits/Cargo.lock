@@ -381,6 +381,7 @@ dependencies = [
  "risc0-zkvm",
  "risc0-zkvm-platform",
  "serde",
+ "ssz-multiproofs",
  "tracing",
  "tracing-subscriber 0.3.19",
 ]

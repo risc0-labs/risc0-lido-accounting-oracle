@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["apps", "guests", "crates/ssz-multiproofs", "crates/gindices", "crates/guest-io"]
+members = ["apps", "guests", "crates/ssz-multiproofs", "crates/gindices", "crates/guest-io", "crates/tracing-risc0"]
 exclude = ["lib"]
 
 [workspace.package]
