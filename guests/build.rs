@@ -18,8 +18,8 @@ use risc0_build::{embed_methods_with_options, DockerOptions, GuestOptions};
 use risc0_build_ethereum::generate_solidity_files;
 
 // Paths where the generated Solidity files will be written.
-const SOLIDITY_IMAGE_ID_PATH: &str = "../contracts/ImageID.sol";
-const SOLIDITY_ELF_PATH: &str = "../tests/Elf.sol";
+const SOLIDITY_IMAGE_ID_PATH: &str = "../contracts/src/ImageID.sol";
+const SOLIDITY_ELF_PATH: &str = "../contracts/tests/Elf.sol";
 
 fn main() {
     git_submodule_init();

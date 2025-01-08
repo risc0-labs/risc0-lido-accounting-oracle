@@ -16,14 +16,13 @@
 
 pragma solidity ^0.8.20;
 
-/// @title A starter application using RISC Zero.
-/// @notice This basic application holds a number, guaranteed to be even.
-/// @dev This contract demonstrates one pattern for offloading the computation of an expensive
-///      or difficult to implement function to a RISC Zero guest running on the zkVM.
-interface IEvenNumber {
-    /// @notice Set the even number stored on the contract. Requires a RISC Zero proof that the number is even.
-    function set(uint256 x, bytes calldata seal) external;
-
-    /// @notice Returns the number stored.
-    function get() external view returns (uint256);
+/// @title LIP-23 beacon chain oracle interface
+interface ISecondOpinionOracle {
+    function getReport(uint256 refSlot) external view returns (
+        bool success,
+        uint256 clBalanceGwei,
+        uint256 withdrawalVaultBalanceWei,
+        uint256 totalDepositedValidators,
+        uint256 totalExitedValidators
+    );
 }

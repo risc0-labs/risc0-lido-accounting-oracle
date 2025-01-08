@@ -1,0 +1,22 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib", "dependencies"]
+test = "tests"
+ffi = true
+fs_permissions = [{ access = "read-write", path = "./"}]
+remappings = [
+    "openzeppelin/contracts/=dependencies/@openzeppelin-contracts-5.1.0/",
+    "forge-std/=dependencies/forge-std-1.9.5/src/",
+    "risc0/=dependencies/risc0-1.2.0/contracts/src/",
+]
+
+[dependencies]
+forge-std = "1.9.5"
+risc0 = { version = "1.2.0", git = "https://github.com/risc0/risc0-ethereum.git", tag = "v1.2.0" }
+"@openzeppelin-contracts" = "5.1.0"
+
+[soldeer]
+remappings_generate = true
+remappings_version = false
+remappings_location = "config"

@@ -1,7 +1,6 @@
 use risc0_zkvm::guest::env;
 use tracing::{Event, Subscriber};
 use tracing_subscriber::fmt::format::{FormatEvent, FormatFields};
-use tracing_subscriber::fmt::SubscriberBuilder;
 use tracing_subscriber::fmt::{self, format::Writer};
 use tracing_subscriber::registry::LookupSpan;
 
@@ -26,16 +25,4 @@ where
             .without_time()
             .format_event(ctx, writer, event)
     }
-}
-
-pub fn fmt() -> SubscriberBuilder<
-    N = format::DefaultFields,
-    E = format::Format<format::Full>,
-    F = LevelFilter,
-    W = fn() -> io::Stdout,
-> {
-    tracing_subscriber::fmt()
-        .with_writer(env::stdout)
-        .without_time()
-        .event_format(Risc0Formatter)
 }
