@@ -1,11 +1,10 @@
 {
     "rust-analyzer.linkedProjects": [
         "./Cargo.toml",
-        "./apps/Cargo.toml",
+        "./cli/Cargo.toml",
         "./guests/Cargo.toml",
         "./guests/validator_membership/Cargo.toml",
         "./guests/balance_and_exits/Cargo.toml",
-
     ],
     "rust-analyzer.check.extraEnv": {
         "RISC0_SKIP_BUILD": "1",

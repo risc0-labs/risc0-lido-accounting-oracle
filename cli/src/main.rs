@@ -12,32 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// This application demonstrates how to send an off-chain proof request
-// to the Bonsai proving service and publish the received proofs directly
-// to your deployed app contract.
+mod beacon_client;
 
-use anyhow::{Context, Result};
-use apps::beacon_client::BeaconClient;
+use anyhow::Result;
+use beacon_client::BeaconClient;
 use clap::Parser;
 use guests::{BALANCE_AND_EXITS_ELF, VALIDATOR_MEMBERSHIP_ELF};
 use risc0_zkvm::{
-    default_executor,
+    default_prover,
+    guest::env,
     serde::{from_slice, to_vec},
-    ExecutorEnv, ProverOpts, VerifierContext,
+    ExecutorEnv, ProverOpts, Receipt, VerifierContext,
 };
-use std::path::PathBuf;
-use tracing::instrument::WithSubscriber;
-use tracing_indicatif::span_ext::IndicatifSpanExt;
+use std::{io::Write, path::PathBuf};
 use tracing_indicatif::IndicatifLayer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::{
-    fmt::{self, format::FmtSpan},
-    EnvFilter,
-};
+use tracing_subscriber::EnvFilter;
 use url::Url;
 
-/// Arguments of the publisher CLI.
+/// CLI for generating and submitting Lido oracle proofs
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
@@ -45,7 +39,7 @@ struct Args {
     #[clap(long, env)]
     beacon_rpc_url: Url,
 
-    /// slot at which to generate an oracle proof for
+    /// slot at which to base the proofs
     #[clap(long)]
     slot: u64,
 
@@ -60,24 +54,30 @@ struct Args {
 #[derive(Parser, Debug)]
 enum Command {
     /// Generate or update a membership proof
-    Update {
-        /// The top validator index the membership proof will be extended to
-        /// if not included it will prove up to the total number of validators
+    Membership {
+        /// The top validator index the membership proof will be extended to.
+        /// If not included it will proceed up to the total number of validators
         /// in the beacon state at the given slot
         #[clap(long)]
         max_validator_index: Option<u64>,
 
-        /// The slot used previously if this is a continuation
-        /// proof, otherwise None if this is the first proof
-        #[clap(long)]
-        prior_slot: Option<u64>,
+        #[clap(long = "out", short)]
+        out_path: Option<PathBuf>,
 
-        /// The validator index used previously if this is a continuation
-        #[clap(long)]
-        prior_max_validator_index: Option<u64>,
+        #[clap(subcommand)]
+        command: MembershipCommand,
     },
     /// Produce the final oracle proof to go on-chain
-    Finalize,
+    Aggregate,
+}
+
+/// Membership specific subcommands of the publisher CLI.
+#[derive(Parser, Debug)]
+enum MembershipCommand {
+    /// Generate a new membership proof from scratch
+    Initialize,
+    /// Update an existing membership proof
+    Update { in_path: PathBuf },
 }
 
 #[tokio::main]
@@ -92,70 +92,117 @@ async fn main() -> Result<()> {
     let args = Args::parse();
 
     match args.command {
-        Command::Update {
+        Command::Membership {
             max_validator_index,
-            prior_slot,
-            prior_max_validator_index,
+            out_path,
+            command: MembershipCommand::Initialize,
         } => {
             build_membership_proof(
-                args,
+                args.beacon_rpc_url,
+                args.slot,
                 max_validator_index,
-                prior_slot,
-                prior_max_validator_index,
+                None,
+                out_path,
             )
             .await?
         }
-        Command::Finalize => build_oracle_proof(args).await?,
+        Command::Membership {
+            max_validator_index,
+            out_path,
+            command: MembershipCommand::Update { in_path },
+        } => {
+            build_membership_proof(
+                args.beacon_rpc_url,
+                args.slot,
+                max_validator_index,
+                Some(in_path),
+                out_path,
+            )
+            .await?
+        }
+        Command::Aggregate => build_aggregate_proof(args).await?,
     }
 
     Ok(())
 }
 
-#[tracing::instrument(skip(args, max_validator_index, prior_slot, prior_max_validator_index))]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct MembershipProof {
+    slot: u64,
+    max_validator_index: u64,
+    receipt: Receipt,
+}
+
+impl MembershipProof {
+    pub fn new(slot: u64, max_validator_index: u64, receipt: Receipt) -> Self {
+        Self {
+            slot,
+            max_validator_index,
+            receipt,
+        }
+    }
+}
+
+#[tracing::instrument]
 async fn build_membership_proof(
-    args: Args,
+    beacon_rpc_url: Url,
+    slot: u64,
     max_validator_index: Option<u64>,
-    prior_slot: Option<u64>,
-    prior_max_validator_index: Option<u64>,
+    in_path: Option<PathBuf>,
+    out_path: Option<PathBuf>,
 ) -> Result<()> {
     use guest_io::validator_membership::{Input, Journal};
 
-    let beacon_client = BeaconClient::new_with_cache(args.beacon_rpc_url, "./beacon-cache")?;
-    let beacon_state = beacon_client.get_beacon_state(args.slot).await?;
+    let beacon_client = BeaconClient::new_with_cache(beacon_rpc_url, "./beacon-cache")?;
+    let beacon_state = beacon_client.get_beacon_state(slot).await?;
 
     tracing::info!("Total validators: {}", beacon_state.validators().len());
 
     let max_validator_index = max_validator_index.unwrap_or(beacon_state.validators().len() as u64);
 
-    let input = if let (Some(prior_slot), Some(prior_max_validator_index)) =
-        (prior_slot, prior_max_validator_index)
-    {
-        let prior_beacon_state = beacon_client.get_beacon_state(prior_slot).await?;
-        Input::build_continuation(
+    let mut env_builder = ExecutorEnv::builder();
+
+    if let Some(in_path) = in_path {
+        tracing::info!("Reading input data from file: {:?}", in_path);
+        let input_data = std::fs::read(in_path)?;
+        let prior_proof: MembershipProof = bincode::deserialize(&input_data)?;
+
+        let prior_beacon_state = beacon_client.get_beacon_state(prior_proof.slot).await?;
+        let input = Input::build_continuation(
             &prior_beacon_state,
-            prior_max_validator_index,
+            prior_proof.max_validator_index,
             &beacon_state,
             max_validator_index,
-        )?
+        )?;
+        env_builder.write(&input)?;
+        env_builder.add_assumption(prior_proof.receipt);
     } else {
-        Input::build_initial(&beacon_state, max_validator_index)?
+        let input = Input::build_initial(&beacon_state, max_validator_index)?;
+        env_builder.write(&input)?;
     };
 
-    tracing::debug!("input size (bytes): {}", to_vec(&input)?.len() * 4);
-
-    let env = ExecutorEnv::builder().write(&input)?.build()?;
-    let session_info = default_executor().execute(env, VALIDATOR_MEMBERSHIP_ELF)?;
+    let env = env_builder.build()?;
+    let session_info = default_prover().prove(env, VALIDATOR_MEMBERSHIP_ELF)?;
     tracing::debug!(
         "program execution returned: {:?}",
-        session_info.journal.decode::<Journal>()?
+        session_info.receipt.journal.decode::<Journal>()?
     );
-    tracing::info!("total cycles: {}", session_info.cycles());
+    tracing::info!("total cycles: {}", session_info.stats.total_cycles);
+
+    let proof = MembershipProof::new(slot, max_validator_index, session_info.receipt);
+    let serialized_proof = bincode::serialize(&proof)?;
+
+    if let Some(out_path) = out_path {
+        std::fs::write(out_path, &serialized_proof)?;
+    } else {
+        std::io::stdout().write(&serialized_proof)?;
+    }
 
     Ok(())
 }
 
 #[tracing::instrument(skip(args))]
-async fn build_oracle_proof(args: Args) -> Result<()> {
+async fn build_aggregate_proof(args: Args) -> Result<()> {
     use guest_io::balance_and_exits::{Input, Journal};
     use std::fs::File;
     use std::io::Write;
@@ -181,12 +228,12 @@ async fn build_oracle_proof(args: Args) -> Result<()> {
 
     let env = ExecutorEnv::builder().write(&input)?.build()?;
 
-    let session_info = default_executor().execute(env, BALANCE_AND_EXITS_ELF)?;
+    let session_info = default_prover().prove(env, BALANCE_AND_EXITS_ELF)?;
     tracing::debug!(
         "program execution returned: {:?}",
-        session_info.journal.decode::<Journal>()?
+        session_info.receipt.journal.decode::<Journal>()?
     );
-    tracing::info!("total cycles: {}", session_info.cycles());
+    tracing::info!("total cycles: {}", session_info.stats.total_cycles);
 
     Ok(())
 }

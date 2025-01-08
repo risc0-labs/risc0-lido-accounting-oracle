@@ -1,7 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["apps", "guests", "crates/ssz-multiproofs", "crates/gindices", "crates/guest-io", "crates/tracing-risc0"]
-exclude = ["lib"]
+members = ["cli", "guests", "crates/ssz-multiproofs", "crates/gindices", "crates/guest-io", "crates/tracing-risc0"]
 
 [workspace.package]
 version = "0.1.0"

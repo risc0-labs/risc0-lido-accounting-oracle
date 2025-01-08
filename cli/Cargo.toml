@@ -1,5 +1,5 @@
 [package]
-name = "apps"
+name = "cli"
 version = { workspace = true }
 edition = { workspace = true }
 
@@ -31,3 +31,4 @@ http-cache-reqwest = "0.15.0"
 bytemuck.workspace = true
 indicatif = "0.17.9"
 tracing-indicatif = "0.3.8"
+bincode.workspace = true
