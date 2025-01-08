@@ -383,6 +383,7 @@ dependencies = [
  "serde",
  "ssz-multiproofs",
  "tracing",
+ "tracing-risc0",
  "tracing-subscriber 0.3.19",
 ]
 
@@ -1918,6 +1919,15 @@ dependencies = [
  "log",
  "once_cell",
  "tracing-core",
+]
+
+[[package]]
+name = "tracing-risc0"
+version = "0.1.0"
+dependencies = [
+ "risc0-zkvm",
+ "tracing",
+ "tracing-subscriber 0.3.19",
 ]
 
 [[package]]

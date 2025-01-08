@@ -27,7 +27,7 @@ pub mod validator_membership {
         pub current_state_root: B256,
 
         /// the top validator index the membership proof will be extended to
-        pub up_to_validator_index: u64,
+        pub max_validator_index: u64,
 
         /// If this the first proof in the sequence, or a continuation that consumes an existing proof
         pub proof_type: ProofType,
@@ -38,15 +38,12 @@ pub mod validator_membership {
 
     #[cfg(feature = "builder")]
     impl Input {
-        #[tracing::instrument(skip(beacon_state, up_to_validator_index))]
-        pub fn build_initial(
-            beacon_state: &BeaconState,
-            up_to_validator_index: u64,
-        ) -> Result<Self> {
+        #[tracing::instrument(skip(beacon_state, max_validator_index))]
+        pub fn build_initial(beacon_state: &BeaconState, max_validator_index: u64) -> Result<Self> {
             let current_state_root = beacon_state.hash_tree_root()?;
 
             let proof_builder =
-                MultiproofBuilder::new().with_gindices((0..up_to_validator_index).map(|i| {
+                MultiproofBuilder::new().with_gindices((0..max_validator_index).map(|i| {
                     beacon_state_gindices::validator_withdrawal_credentials(i)
                         .try_into()
                         .unwrap()
@@ -57,7 +54,7 @@ pub mod validator_membership {
             Ok(Self {
                 self_program_id: [0_u8; 32].into(),
                 current_state_root,
-                up_to_validator_index,
+                max_validator_index,
                 proof_type: ProofType::Initial,
                 multiproof,
             })
@@ -65,35 +62,33 @@ pub mod validator_membership {
 
         #[tracing::instrument(skip(
             prior_beacon_state,
-            prior_up_to_validator_index,
+            prior_max_validator_index,
             beacon_state,
-            up_to_validator_index
+            max_validator_index
         ))]
         pub fn build_continuation(
             prior_beacon_state: &BeaconState,
-            prior_up_to_validator_index: u64,
+            prior_max_validator_index: u64,
             beacon_state: &BeaconState,
-            up_to_validator_index: u64,
+            max_validator_index: u64,
         ) -> Result<Self> {
             let current_state_root = beacon_state.hash_tree_root()?;
             let prior_slot = prior_beacon_state.slot();
 
             let proof_builder = MultiproofBuilder::new()
                 .with_gindex(beacon_state_gindices::state_roots(prior_slot).try_into()?)
-                .with_gindices(
-                    (prior_up_to_validator_index..up_to_validator_index).map(|i| {
-                        beacon_state_gindices::validator_withdrawal_credentials(i)
-                            .try_into()
-                            .unwrap()
-                    }),
-                );
+                .with_gindices((prior_max_validator_index..max_validator_index).map(|i| {
+                    beacon_state_gindices::validator_withdrawal_credentials(i)
+                        .try_into()
+                        .unwrap()
+                }));
 
             let multiproof = build_with_versioned_state(proof_builder, &beacon_state)?;
 
             let prior_membership = prior_beacon_state
                 .validators()
                 .iter()
-                .take(prior_up_to_validator_index as usize)
+                .take(prior_max_validator_index as usize)
                 .map(|v| {
                     v.withdrawal_credentials.as_slice() == crate::WITHDRAWAL_CREDENTIALS.as_slice()
                 })
@@ -101,11 +96,11 @@ pub mod validator_membership {
             Ok(Self {
                 self_program_id: [0_u8; 32].into(),
                 current_state_root,
-                up_to_validator_index,
+                max_validator_index,
                 proof_type: ProofType::Continuation {
                     prior_state_root: prior_beacon_state.hash_tree_root()?.into(),
                     prior_slot,
-                    prior_up_to_validator_index,
+                    prior_max_validator_index,
                     prior_membership,
                 },
                 multiproof,
@@ -119,7 +114,7 @@ pub mod validator_membership {
         Continuation {
             prior_state_root: B256,
             prior_slot: u64,
-            prior_up_to_validator_index: u64,
+            prior_max_validator_index: u64,
             prior_membership: BitVec<u32, Lsb0>,
         },
     }
@@ -128,7 +123,7 @@ pub mod validator_membership {
     pub struct Journal {
         pub self_program_id: Digest,
         pub state_root: B256,
-        pub up_to_validator_index: u64,
+        pub max_validator_index: u64,
         pub membership: BitVec<u32, Lsb0>,
     }
 }
@@ -168,10 +163,12 @@ pub mod balance_and_exits {
             tracing::info!("{} Lido validators detected", membership.count_ones());
 
             let block_multiproof = MultiproofBuilder::new()
+                .with_gindex(beacon_block_gindices::slot().try_into()?)
                 .with_gindex(beacon_block_gindices::state_root().try_into()?)
                 .build(block_header)?;
 
             let state_multiproof_builder = MultiproofBuilder::new()
+                .with_gindex(beacon_state_gindices::validator_count().try_into()?)
                 .with_gindices(membership.iter_ones().map(|i| {
                     beacon_state_gindices::validator_balance(i as u64)
                         .try_into()

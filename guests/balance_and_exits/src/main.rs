@@ -4,35 +4,13 @@ use bitvec::vec::BitVec;
 use gindices::presets::mainnet::beacon_block as beacon_block_gindices;
 use gindices::presets::mainnet::beacon_state as beacon_state_gindices;
 use guest_io::balance_and_exits::{Input, Journal};
-use risc0_zkvm::guest::env;
-use ssz_multiproofs::Multiproof;
+use guest_io::validator_membership::Journal as MembershipJounal;
+use risc0_zkvm::{guest::env, serde};
+use tracing_risc0::Risc0Formatter;
 use tracing_subscriber::fmt::format::FmtSpan;
 
-use tracing::{Event, Subscriber};
-use tracing_subscriber::fmt::format::{FormatEvent, FormatFields};
-use tracing_subscriber::fmt::{self, format::Writer};
-use tracing_subscriber::registry::LookupSpan;
-
-struct Risc0Formatter;
-
-impl<S, N> FormatEvent<S, N> for Risc0Formatter
-where
-    S: Subscriber + for<'a> LookupSpan<'a>,
-    N: for<'a> FormatFields<'a> + 'static,
-{
-    fn format_event(
-        &self,
-        ctx: &fmt::FmtContext<'_, S, N>,
-        mut writer: Writer<'_>,
-        event: &Event<'_>,
-    ) -> std::fmt::Result {
-        // Write the custom field
-        write!(writer, "R0VM[cycles={}]", env::cycle_count())?;
-
-        // Use the default formatter to format the rest of the event
-        fmt::format().without_time().format_event(ctx, writer, event)
-    }
-}
+// this must be updated when the membership guest program is updated
+const VALIDATOR_MEMBERSHIP_ID: [u8; 32] = [0; 32];
 
 pub fn main() {
     tracing_subscriber::fmt()
@@ -53,8 +31,10 @@ pub fn main() {
     block_multiproof
         .verify(&block_root)
         .expect("Failed to verify block multiproof");
+    let mut block_values = block_multiproof.values();
 
-    let state_root = verify_state_root_in_block(&block_multiproof, &block_root);
+    let slot = get_slot(&mut block_values);
+    let state_root = get_state_root(&mut block_values);
 
     multiproof
         .verify(&state_root)
@@ -62,7 +42,11 @@ pub fn main() {
     let mut values = multiproof.values();
 
     let num_validators = membership.count_ones() as u64;
-    let num_exited_validators = count_exited_validators(&mut values, &membership, 0); // TODO: Use actual current epoch
+    let num_exited_validators = count_exited_validators(&mut values, &membership, slot);
+
+    let validator_count = get_validator_count(&mut values);
+    verify_membership(&state_root, &membership, validator_count);
+
     let cl_balance = accumulate_balances(&mut values, &membership);
 
     let journal = Journal {
@@ -74,22 +58,42 @@ pub fn main() {
     env::commit(&journal);
 }
 
-#[tracing::instrument(skip(block_multiproof))]
-fn verify_state_root_in_block<'a>(block_multiproof: &'a Multiproof, state_root: &B256) -> &'a B256 {
-    let (state_root_gindex, state_root) = block_multiproof
-        .values()
-        .next()
-        .expect("Missing state root in multiproof");
-    assert_eq!(state_root_gindex, beacon_block_gindices::state_root());
+fn get_slot<'a, I: Iterator<Item = (u64, &'a B256)>>(values: &mut I) -> u64 {
+    let (gindex, slot) = values.next().expect("Missing slot in multiproof");
+    assert_eq!(gindex, beacon_block_gindices::slot());
+    u64_from_b256(slot, 0)
+}
+
+fn get_state_root<'a, I: Iterator<Item = (u64, &'a B256)>>(values: &mut I) -> &'a B256 {
+    let (gindex, state_root) = values.next().expect("Missing state_root in multiproof");
+    assert_eq!(gindex, beacon_block_gindices::state_root());
     state_root
+}
+
+fn get_validator_count<'a, I: Iterator<Item = (u64, &'a B256)>>(values: &mut I) -> u64 {
+    let (gindex, slot) = values.next().expect("Missing validator_count in multiproof");
+    assert_eq!(gindex, beacon_state_gindices::validator_count());
+    u64_from_b256(slot, 0)
+}
+
+#[tracing::instrument(skip(membership))]
+fn verify_membership(state_root: &B256, membership: &BitVec<u32, Lsb0>, max_validator_index: u64) {
+    let j = MembershipJounal {
+        self_program_id: VALIDATOR_MEMBERSHIP_ID.into(),
+        state_root: state_root.clone(),
+        membership: membership.clone(),
+        max_validator_index,
+    };
+    env::verify(VALIDATOR_MEMBERSHIP_ID, &serde::to_vec(&j).unwrap()).expect("Failed to verify membership bitvec");
 }
 
 #[tracing::instrument(skip(values, membership))]
 fn count_exited_validators<'a, I: Iterator<Item = (u64, &'a B256)>>(
     values: &mut I,
     membership: &BitVec<u32, Lsb0>,
-    current_epoch: u64,
+    slot: u64,
 ) -> u64 {
+    let current_epoch = slot / 32;
     let mut num_exited_validators = 0;
     // Iterate the validator exit epochs
     for validator_index in membership.iter_ones() {
@@ -103,8 +107,9 @@ fn count_exited_validators<'a, I: Iterator<Item = (u64, &'a B256)>>(
     num_exited_validators
 }
 
+#[tracing::instrument(skip(values, membership))]
 fn accumulate_balances<'a, I: Iterator<Item = (u64, &'a B256)>>(values: &mut I, membership: &BitVec<u32, Lsb0>) -> u64 {
-    // accumulate the balances
+    // accumulate the balances but iterating over the membership bitvec
     // This is a little tricky as multiple balances are packed into a single gindex
     let mut cl_balance = 0;
     let mut current_leaf = values.next().expect("Missing valdator balance value in multiproof");

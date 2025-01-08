@@ -1907,6 +1907,7 @@ dependencies = [
  "risc0-zkp",
  "risc0-zkvm",
  "serde",
+ "ssz-multiproofs",
 ]
 
 [[package]]

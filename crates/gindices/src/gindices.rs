@@ -4,6 +4,10 @@ pub mod presets {
     pub mod mainnet {
 
         pub mod beacon_block {
+            pub fn slot() -> u64 {
+                8
+            }
+
             pub fn state_root() -> u64 {
                 11
             }
@@ -15,6 +19,10 @@ pub mod presets {
 
             pub fn slot() -> u64 {
                 34
+            }
+
+            pub fn validator_count() -> u64 {
+                87
             }
 
             pub fn state_roots(index: u64) -> u64 {
@@ -55,12 +63,35 @@ mod test {
     }
 
     #[test]
+    fn block_slot() -> anyhow::Result<()> {
+        assert_eq!(
+            ethereum_consensus::phase0::presets::mainnet::BeaconBlock::generalized_index(&[
+                "slot".into(),
+            ])? as u64,
+            presets::mainnet::beacon_block::slot()
+        );
+        Ok(())
+    }
+
+    #[test]
     fn slot() -> anyhow::Result<()> {
         assert_eq!(
             ethereum_consensus::phase0::presets::mainnet::BeaconState::generalized_index(&[
                 "slot".into(),
             ])? as u64,
             presets::mainnet::beacon_state::slot()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn validator_count() -> anyhow::Result<()> {
+        assert_eq!(
+            ethereum_consensus::phase0::presets::mainnet::BeaconState::generalized_index(&[
+                "validators".into(),
+                PathElement::Length,
+            ])? as u64,
+            presets::mainnet::beacon_state::validator_count()
         );
         Ok(())
     }

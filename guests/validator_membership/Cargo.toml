@@ -7,6 +7,7 @@ edition = "2021"
 [dependencies]
 guest-io = { path = "../../crates/guest-io", default-features = false }
 gindices = { path = "../../crates/gindices" }
+ssz-multiproofs = { path = "../../crates/ssz-multiproofs" }
 
 bitvec = { version = "1", features = ["serde"] }
 serde = "1.0.215"
