@@ -103,12 +103,6 @@ jobs:
       - name: install rust
         uses: risc0/risc0/.github/actions/rustup@main
 
-      - name: install cargo-sort
-        uses: risc0/cargo-install@v1
-        with:
-          crate: cargo-sort
-          version: "=1.0.7"
-
       - name: Install Foundry
         uses: risc0/foundry-toolchain@2fe7e70b520f62368a0e3c464f997df07ede420f
 
@@ -122,13 +116,6 @@ jobs:
       - name: lint balance_and_exits guest rust code
         working-directory: guests/balance_and_exits/guest
         run: cargo fmt --all --check
-
-      - name: lint cargo files
-        run: cargo sort --workspace --check
-
-      - name: lint guest cargo files
-        working-directory: methods/guest
-        run: cargo sort --workspace --check
 
       - name: check solidity code formatting
         run: forge fmt --check

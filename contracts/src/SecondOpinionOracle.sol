@@ -49,13 +49,7 @@ contract SecondOpinionOracle is ISecondOpinionOracle {
         bytes32 blockRoot = BlockRoots.findBlockRoot(refSlot);
 
         bytes memory journal = abi.encodePacked(
-            (
-                blockRoot,
-                r.clBalanceGwei,
-                r.withdrawalVaultBalanceWei,
-                r.totalDepositedValidators,
-                r.totalExitedValidators,
-            )
+            blockRoot, r.clBalanceGwei, r.withdrawalVaultBalanceWei, r.totalDepositedValidators, r.totalExitedValidators
         );
         verifier.verify(seal, imageId, sha256(journal));
 
