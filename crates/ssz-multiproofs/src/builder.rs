@@ -15,6 +15,12 @@ fn suspend_tracing<F: FnOnce() -> R, R>(f: F) -> R {
     f()
 }
 
+/// The only way to create a multiproof is via this builder.
+///
+/// The usage process is as follows:
+/// - A number of gindices/paths are be registered with the builder
+/// - Calling `build` with a SSZ container (type that implements `Prove`) results in a multiproof containing the data at those gindices/paths.
+///     This will error if any of the gindices/paths are invalid for the container.
 #[derive(Debug)]
 pub struct MultiproofBuilder {
     gindices: BTreeSet<GeneralizedIndex>,
@@ -27,17 +33,23 @@ impl MultiproofBuilder {
         }
     }
 
+    /// Register a path in the container for data to be included in the proof
+    /// Paths and gindices are equivalent, but paths are more human-readable
+    /// This will be used to retrieve the corresponding 32 byte word from the container at build time
     pub fn with_path<T: GeneralizedIndexable>(mut self, path: Path) -> Self {
         self.gindices
             .insert(T::generalized_index(path).expect("Path is not valid for this type"));
         self
     }
 
+    /// Register a single gindex to be included in the proof.
+    /// This will be used to retrieve the corresponding 32 byte word from the container at build time
     pub fn with_gindex(mut self, gindex: GeneralizedIndex) -> Self {
         self.gindices.insert(gindex);
         self
     }
 
+    /// Register an iterator of gindices to be included in the proof
     pub fn with_gindices<'a, I>(mut self, gindices: I) -> Self
     where
         I: IntoIterator<Item = GeneralizedIndex>,
@@ -46,8 +58,7 @@ impl MultiproofBuilder {
         self
     }
 
-    // build the multi-proof for a given container
-    // the resulting multi-proof will be sorted by descending gindex in both the leaves and proof nodes
+    /// Build the multi-proof for a given container
     #[tracing::instrument(skip(self, container))]
     pub fn build<T: Prove + Sync>(self, container: &T) -> Result<Multiproof> {
         let gindices = self.gindices.into_iter().collect::<Vec<_>>();

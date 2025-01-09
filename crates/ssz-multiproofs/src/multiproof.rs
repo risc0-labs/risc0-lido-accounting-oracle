@@ -39,6 +39,7 @@ impl Multiproof {
         }
     }
 
+    /// Calculate the root of this multi-proof
     pub fn calculate_root(&self) -> Result<Node> {
         calculate_compact_multi_merkle_root(&self.nodes, &self.descriptor, self.max_stack_depth)
     }
@@ -122,6 +123,8 @@ impl<'a> TreeNode<'a> {
     }
 }
 
+/// Compute the root of a compact multi-proof given the nodes and descriptor
+/// This is the hot path so any optimizations belong here.
 fn calculate_compact_multi_merkle_root(
     nodes: &[Node],
     descriptor: &Descriptor,

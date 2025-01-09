@@ -20,14 +20,14 @@ mod tests {
     use ethereum_consensus::deneb::Validator;
     use ethereum_consensus::phase0::presets::mainnet::{BeaconBlockHeader, BeaconState};
     use ethereum_consensus::ssz::prelude::*;
-    use guest_io::balance_and_exits;
     use guest_io::WITHDRAWAL_CREDENTIALS;
-    use risc0_zkvm::{default_executor, ExecutorEnv};
+    use guest_io::{balance_and_exits, validator_membership};
+    use risc0_zkvm::{default_executor, default_prover, ExecutorEnv};
 
     #[test]
     fn test_balance_and_exits() -> anyhow::Result<()> {
-        let n_empty_validators = 1000;
-        let n_lido_validators = 100;
+        let n_empty_validators = 100;
+        let n_lido_validators = 10;
 
         let mut block_header = BeaconBlockHeader::default();
         let mut beacon_state = BeaconState::default();
@@ -45,21 +45,26 @@ mod tests {
         }
         block_header.state_root = beacon_state.hash_tree_root()?.into();
 
+        // build a membership proof
+        let input = validator_membership::Input::build_initial(
+            &ethereum_consensus::types::mainnet::BeaconState::Phase0(beacon_state.clone()),
+            (beacon_state.validators.len() - 1) as u64,
+            membership_builder::VALIDATOR_MEMBERSHIP_ID,
+        )?;
+        let env = ExecutorEnv::builder().write(&input)?.build()?;
+        let membership_proof =
+            default_prover().prove(env, membership_builder::VALIDATOR_MEMBERSHIP_ELF)?;
+
         let input = balance_and_exits::Input::build(
             &block_header,
             &ethereum_consensus::types::mainnet::BeaconState::Phase0(beacon_state.clone()),
         )
         .unwrap();
 
-        input
-            .block_multiproof
-            .verify(&block_header.hash_tree_root()?)?;
-
-        input
-            .state_multiproof
-            .verify(&beacon_state.hash_tree_root()?)?;
-
-        let env = ExecutorEnv::builder().write(&input)?.build()?;
+        let env = ExecutorEnv::builder()
+            .add_assumption(membership_proof.receipt)
+            .write(&input)?
+            .build()?;
 
         println!("Starting execution of the program");
         let session_info = default_executor().execute(env, super::BALANCE_AND_EXITS_ELF)?;

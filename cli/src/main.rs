@@ -24,7 +24,11 @@ use risc0_zkvm::{
     serde::{from_slice, to_vec},
     ExecutorEnv, Receipt,
 };
-use std::{fs::File, io::Write, path::PathBuf};
+use std::{
+    fs::{read, File},
+    io::Write,
+    path::PathBuf,
+};
 use tracing_indicatif::IndicatifLayer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
@@ -175,14 +179,14 @@ async fn build_membership_proof(
 
     tracing::info!("Total validators: {}", beacon_state.validators().len());
 
-    let max_validator_index = max_validator_index.unwrap_or(beacon_state.validators().len() as u64);
+    let max_validator_index =
+        max_validator_index.unwrap_or((beacon_state.validators().len() - 1) as u64);
 
     let mut env_builder = ExecutorEnv::builder();
 
     let env = if let Some(in_path) = in_path {
         tracing::info!("Reading input data from file: {:?}", in_path);
-        let input_data = std::fs::read(in_path)?;
-        let prior_proof: MembershipProof = bincode::deserialize(&input_data)?;
+        let prior_proof: MembershipProof = bincode::deserialize(&read(in_path)?)?;
 
         let prior_beacon_state = beacon_client.get_beacon_state(prior_proof.slot).await?;
         let input = Input::build_continuation(
@@ -246,7 +250,12 @@ async fn build_aggregate_proof(
         input
     };
 
-    let env = ExecutorEnv::builder().write(&input)?.build()?;
+    let membership_proof: MembershipProof = bincode::deserialize(&read(membership_proof_path)?)?;
+
+    let env = ExecutorEnv::builder()
+        .add_assumption(membership_proof.receipt)
+        .write(&input)?
+        .build()?;
 
     let session_info = default_prover().prove(env, BALANCE_AND_EXITS_ELF)?;
     tracing::debug!(

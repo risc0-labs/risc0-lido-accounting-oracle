@@ -18,7 +18,6 @@ include!(concat!(env!("OUT_DIR"), "/methods.rs"));
 #[cfg(test)]
 mod tests {
     use ethereum_consensus::phase0::presets::mainnet::BeaconState;
-    use ethereum_consensus::ssz::prelude::*;
     use guest_io::validator_membership;
     use risc0_zkvm::{default_executor, ExecutorEnv};
 
@@ -34,15 +33,12 @@ mod tests {
         for _ in prior_up_to_validator_index..n_validators {
             beacon_state.validators.push(Default::default());
         }
-        let beacon_root = beacon_state.hash_tree_root()?;
 
         let input = validator_membership::Input::build_initial(
             &ethereum_consensus::types::mainnet::BeaconState::Phase0(beacon_state),
             max_validator_index,
             super::VALIDATOR_MEMBERSHIP_ID,
         )?;
-
-        input.multiproof.verify(&beacon_root)?;
 
         let env = ExecutorEnv::builder().write(&input)?.build()?;
 

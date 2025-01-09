@@ -57,7 +57,7 @@ pub fn main() {
     let num_exited_validators = count_exited_validators(&mut values, &membership, slot);
 
     let validator_count = get_validator_count(&mut values);
-    // verify_membership(&state_root, &membership, validator_count);
+    verify_membership(&state_root, &membership, validator_count);
 
     let cl_balance = accumulate_balances(&mut values, &membership);
 
@@ -91,7 +91,8 @@ fn get_validator_count<'a, I: Iterator<Item = (u64, &'a B256)>>(values: &mut I) 
 }
 
 #[tracing::instrument(skip(membership))]
-fn verify_membership(state_root: &B256, membership: &BitVec<u32, Lsb0>, max_validator_index: u64) {
+fn verify_membership(state_root: &B256, membership: &BitVec<u32, Lsb0>, validator_count: u64) {
+    let max_validator_index = validator_count - 1;
     let j = MembershipJounal {
         self_program_id: VALIDATOR_MEMBERSHIP_ID.into(),
         state_root: state_root.clone(),
@@ -132,15 +133,14 @@ fn accumulate_balances<'a, I: Iterator<Item = (u64, &'a B256)>>(
     // accumulate the balances but iterating over the membership bitvec
     // This is a little tricky as multiple balances are packed into a single gindex
     let mut cl_balance = 0;
-    let mut current_leaf = values
-        .next()
-        .expect("Missing valdator balance value in multiproof");
+    let mut current_leaf = (0, &B256::default()); // 0 is an invalid gindex so this will always be updated on the first validator
     for validator_index in membership.iter_ones() {
         let expeted_gindex = beacon_state_gindices::validator_balance(validator_index as u64);
         if current_leaf.0 != expeted_gindex {
-            current_leaf = values
-                .next()
-                .expect("Missing valdator balance value in multiproof");
+            current_leaf = values.next().expect(&format!(
+                "Missing valdator {} balance value in multiproof",
+                validator_index,
+            ));
         }
         assert_eq!(current_leaf.0, expeted_gindex);
         let balance = u64_from_b256(&current_leaf.1, validator_index as usize % 4);

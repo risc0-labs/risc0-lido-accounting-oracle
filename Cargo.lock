@@ -1119,6 +1119,7 @@ dependencies = [
  "ethereum-consensus",
  "guest-io",
  "hex",
+ "membership_builder",
  "risc0-build",
  "risc0-build-ethereum",
  "risc0-zkp",
