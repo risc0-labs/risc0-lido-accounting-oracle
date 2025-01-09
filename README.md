@@ -103,11 +103,80 @@ This repo uses [just](https://github.com/casey/just) as a command runner. Instal
 
 ## Usage
 
+### Configuration
+
+Building proofs requires access to a beacon chain RPC (that supports the `debug_` methods), an execution layer RPC, and a proving service (e.g. Bonsai or Boundless). 
+
+> [!IMPORTANT]
+> Many beacon chain RPC provides do not support the required debug methods for retrieving beacon state to build a proof. Quiknode is known to provide this but there may also be others.
+
+These are configured via environment variables. Copy the [.env.example] to a .env file in the repo root and configure for your remote services.
+
+### Simple Usage via CLI
+
+Using the justfile scripts provides a simple way to get started and examples of using the CLI. 
+
+#### Initial membership proof
+
+To create an initial membership proof for a given slot (e.g. slot 1000) run
+
+```shell
+just initialize_membership 1000
+```
+
+> [!WARNING]
+> Attempting to initialize at a recent slot with many validators will be slow and may exceed the ZKVM memory limit. Better to progressively build up the proof using recursion. Updates between Oracle reports (days) will be quite fast
+
+#### Updating a membership proof
+
+Update an existing membership proof with
+
+```shell
+just update_membership 1000 1100
+```
+
+where 1000 is the prior slot and 1100 is the next slot. This will write a new proof that composes the old one and proves the membership of all validators up to slot 1100.
+
+#### Building an aggregate oracle proof
+
+To build a proof ready to submit on-chain run:
+
+```shell
+just aggregate 1100
+```
+
+This requires that a membership proof for slot 1100 has already been created. It will write to file a proof and report ready to submit on-chain
+
+> [!NOTE]
+> For slots containing many Lido validators this will take a long time to build the SSZ proof input locally (hours) and to generate the proof (minutes on Bonsai)
+
+#### More advanced usage
+
+Using the CLI directly provides more flexibility. See the help and subcommands help
+
+```
+> cargo run --help
+CLI for generating and submitting Lido oracle proofs
+
+Usage: cli [OPTIONS] --beacon-rpc-url <BEACON_RPC_URL> --slot <SLOT> <COMMAND>
+
+Commands:
+  membership  Generate or update a membership proof
+  aggregate   Produce the final oracle proof to go on-chain
+  help        Print this message or the help of the given subcommand(s)
+
+Options:
+      --beacon-rpc-url <BEACON_RPC_URL>
+          Ethereum beacon node HTTP RPC endpoint [env: BEACON_RPC_URL=]
+      --slot <SLOT>
+          slot at which to base the proofs
+      --input-data <INPUT_DATA>
+```
 
 
 ## Deployment
 
-See the [deployment guide](./docs/deployment-guide.md) for instructions in deploying the oracle contracts
+See the [deployment guide](./docs/deployment-guide.md) for instructions on deploying the oracle contracts
 
 ## Security Disclaimer
 

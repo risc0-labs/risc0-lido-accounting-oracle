@@ -1,10 +1,10 @@
 set dotenv-load := true
 
-initialize:
-    cargo run --release -- --slot 1000 membership --out ./proof1.bin initialize
+initialize_membership slot:
+    cargo run --release -- --slot {{slot}} membership --out ./membership_proof_{{slot}}.bin initialize
 
-# update:
-#     cargo run --release -- --slot 4636801 membership --max-validator-index 110 --out ./proof2.bin update ./proof1.bin
+update_membership prior_slot slot:
+    cargo run --release -- --slot {{slot}} membership --max-validator-index 110 --out ./membership_proof_{{slot}}.bin update ./membership_proof_{{prior_slot}}.bin
 
-aggregate:
-    cargo run --release -- --slot 1000 aggregate --out ./aggproof.bin ./proof1.bin
+aggregate slot:
+    cargo run --release -- --slot {{slot}} aggregate --out ./aggproof_{{slot}}.bin ./proof1.bin
