@@ -5,7 +5,7 @@ edition = { workspace = true }
 
 [dependencies]
 ssz-multiproofs.workspace = true
-guest-io = { workspace = true, features = ["builder"] }
+guest-io = { workspace = true, features = ["builder", "progress-bar"] }
 membership_builder.workspace = true
 balance_and_exits_builder.workspace = true
 

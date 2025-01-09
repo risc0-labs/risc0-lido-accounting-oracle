@@ -5,7 +5,8 @@ edition = "2021"
 
 [features]
 default = []
-builder = ["dep:ssz_rs", "dep:ethereum-consensus", "dep:rayon", "dep:indicatif", "dep:tracing-indicatif"]
+builder = ["dep:ssz_rs", "dep:ethereum-consensus", "dep:rayon"]
+progress-bar = ["dep:indicatif", "dep:tracing-indicatif"]
 
 [dependencies]
 serde.workspace = true

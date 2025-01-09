@@ -25,7 +25,7 @@ fn main() {
     });
 
     // Generate Rust source files for the methods crate.
-    let guests = embed_methods_with_options(HashMap::from([(
+    embed_methods_with_options(HashMap::from([(
         "validator_membership",
         GuestOptions {
             features: Vec::new(),

@@ -6,6 +6,7 @@ edition = "2021"
 [features]
 default = []
 builder = ["ssz-multiproofs/builder", "dep:ssz_rs", "dep:ethereum-consensus", "dep:gindices"]
+progress-bar = ["ssz-multiproofs/progress-bar"]
 
 [dependencies]
 ssz-multiproofs = { workspace = true, default-features = false }

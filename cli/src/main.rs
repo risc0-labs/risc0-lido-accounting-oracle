@@ -21,11 +21,10 @@ use clap::Parser;
 use membership_builder::{VALIDATOR_MEMBERSHIP_ELF, VALIDATOR_MEMBERSHIP_ID};
 use risc0_zkvm::{
     default_prover,
-    guest::env,
     serde::{from_slice, to_vec},
-    ExecutorEnv, ProverOpts, Receipt, VerifierContext,
+    ExecutorEnv, Receipt,
 };
-use std::{io::Write, path::PathBuf};
+use std::{fs::File, io::Write, path::PathBuf};
 use tracing_indicatif::IndicatifLayer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
@@ -63,13 +62,18 @@ enum Command {
         max_validator_index: Option<u64>,
 
         #[clap(long = "out", short)]
-        out_path: Option<PathBuf>,
+        out_path: PathBuf,
 
         #[clap(subcommand)]
         command: MembershipCommand,
     },
     /// Produce the final oracle proof to go on-chain
-    Aggregate,
+    Aggregate {
+        #[clap(long = "out", short)]
+        out_path: PathBuf,
+
+        membership_proof_path: PathBuf,
+    },
 }
 
 /// Membership specific subcommands of the publisher CLI.
@@ -121,7 +125,19 @@ async fn main() -> Result<()> {
             )
             .await?
         }
-        Command::Aggregate => build_aggregate_proof(args).await?,
+        Command::Aggregate {
+            out_path,
+            membership_proof_path,
+        } => {
+            build_aggregate_proof(
+                args.beacon_rpc_url,
+                args.slot,
+                membership_proof_path,
+                args.input_data,
+                out_path,
+            )
+            .await?
+        }
     }
 
     Ok(())
@@ -150,7 +166,7 @@ async fn build_membership_proof(
     slot: u64,
     max_validator_index: Option<u64>,
     in_path: Option<PathBuf>,
-    out_path: Option<PathBuf>,
+    out_path: PathBuf,
 ) -> Result<()> {
     use guest_io::validator_membership::{Input, Journal};
 
@@ -196,36 +212,36 @@ async fn build_membership_proof(
     let proof = MembershipProof::new(slot, max_validator_index, session_info.receipt);
     let serialized_proof = bincode::serialize(&proof)?;
 
-    if let Some(out_path) = out_path {
-        std::fs::write(out_path, &serialized_proof)?;
-    } else {
-        std::io::stdout().write(&serialized_proof)?;
-    }
+    std::fs::write(out_path, &serialized_proof)?;
 
     Ok(())
 }
 
-#[tracing::instrument(skip(args))]
-async fn build_aggregate_proof(args: Args) -> Result<()> {
+#[tracing::instrument(skip(beacon_rpc_url))]
+async fn build_aggregate_proof(
+    beacon_rpc_url: Url,
+    slot: u64,
+    membership_proof_path: PathBuf,
+    input_path: Option<PathBuf>,
+    out_path: PathBuf,
+) -> Result<()> {
     use guest_io::balance_and_exits::{Input, Journal};
-    use std::fs::File;
-    use std::io::Write;
 
-    let input = if let Some(input_data) = args.input_data {
+    let input = if let Some(input_data) = input_path {
         tracing::info!("Reading input data from file: {:?}", input_data);
         let input_data = std::fs::read(input_data)?;
         let input: Input = from_slice(&input_data)?;
         input
     } else {
-        let beacon_client = BeaconClient::new_with_cache(args.beacon_rpc_url, "./beacon-cache")?;
-        let beacon_block_header = beacon_client.get_block_header(args.slot).await?;
+        let beacon_client = BeaconClient::new_with_cache(beacon_rpc_url, "./beacon-cache")?;
+        let beacon_block_header = beacon_client.get_block_header(slot).await?;
 
-        let beacon_state = beacon_client.get_beacon_state(args.slot).await?;
+        let beacon_state = beacon_client.get_beacon_state(slot).await?;
         let input = Input::build(&beacon_block_header.message, &beacon_state)?;
 
         // serialize input and write it to file
         let serialized_input = to_vec(&input)?;
-        let mut file = File::create(format!("input_data_slot_{}.bin", args.slot))?;
+        let mut file = File::create(format!("input_data_slot_{}.bin", slot))?;
         file.write_all(&bytemuck::cast_slice(&serialized_input))?;
         input
     };

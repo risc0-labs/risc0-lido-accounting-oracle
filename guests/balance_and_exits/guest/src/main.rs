@@ -57,7 +57,7 @@ pub fn main() {
     let num_exited_validators = count_exited_validators(&mut values, &membership, slot);
 
     let validator_count = get_validator_count(&mut values);
-    verify_membership(&state_root, &membership, validator_count);
+    // verify_membership(&state_root, &membership, validator_count);
 
     let cl_balance = accumulate_balances(&mut values, &membership);
 

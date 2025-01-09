@@ -25,8 +25,8 @@ mod tests {
     #[test]
     fn test_initial_proof() -> anyhow::Result<()> {
         let prior_up_to_validator_index = 0;
-        let up_to_validator_index = 1000;
-        let n_validators = 1000;
+        let max_validator_index = 1000;
+        let n_validators = 1001;
 
         let mut beacon_state = BeaconState::default();
 
@@ -38,7 +38,7 @@ mod tests {
 
         let input = validator_membership::Input::build_initial(
             &ethereum_consensus::types::mainnet::BeaconState::Phase0(beacon_state),
-            up_to_validator_index,
+            max_validator_index,
             super::VALIDATOR_MEMBERSHIP_ID,
         )?;
 
