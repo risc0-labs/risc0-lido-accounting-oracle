@@ -1,10 +1,10 @@
 [package]
-name = "guests"
+name = "membership_builder"
 version = { workspace = true }
 edition = { workspace = true }
 
 [package.metadata.risc0]
-methods = ["validator_membership", "balance_and_exits"]
+methods = ["guest"]
 
 [build-dependencies]
 hex = { workspace = true }

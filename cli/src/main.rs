@@ -15,9 +15,10 @@
 mod beacon_client;
 
 use anyhow::Result;
+use balance_and_exits_builder::BALANCE_AND_EXITS_ELF;
 use beacon_client::BeaconClient;
 use clap::Parser;
-use guests::{BALANCE_AND_EXITS_ELF, VALIDATOR_MEMBERSHIP_ELF, VALIDATOR_MEMBERSHIP_ID};
+use membership_builder::{VALIDATOR_MEMBERSHIP_ELF, VALIDATOR_MEMBERSHIP_ID};
 use risc0_zkvm::{
     default_prover,
     guest::env,

@@ -1,3 +1,17 @@
+// Copyright 2023 RISC Zero, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use bitvec::prelude::*;
 use gindices::presets::mainnet::beacon_state as beacon_state_gindices;
 use guest_io::validator_membership::{Input, Journal, ProofType};
@@ -49,7 +63,9 @@ pub fn main() {
         // within the current state
         if prior_state_root != current_state_root {
             // Verify the pre-state requirement
-            let (gindex, value) = values.next().expect("Missing state_root value in multiproof");
+            let (gindex, value) = values
+                .next()
+                .expect("Missing state_root value in multiproof");
             assert_eq!(gindex, beacon_state_gindices::state_roots(prior_slot));
             assert_eq!(value, &prior_state_root);
         }
@@ -61,11 +77,13 @@ pub fn main() {
             max_validator_index: prior_max_validator_index,
             membership: prior_membership.clone(),
         };
-        env::verify(self_program_id, &to_vec(&prior_proof_journal).unwrap()).expect("Failed to verify prior proof");
+        env::verify(self_program_id, &to_vec(&prior_proof_journal).unwrap())
+            .expect("Failed to verify prior proof");
     }
 
     for validator_index in start_validator_index..=max_validator_index {
-        let expected_gindex = beacon_state_gindices::validator_withdrawal_credentials(validator_index);
+        let expected_gindex =
+            beacon_state_gindices::validator_withdrawal_credentials(validator_index);
         let (gindex, value) = values
             .next()
             .expect("Missing withdrawal_credentials value in multiproof");

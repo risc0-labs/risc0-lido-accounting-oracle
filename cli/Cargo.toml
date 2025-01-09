@@ -6,7 +6,8 @@ edition = { workspace = true }
 [dependencies]
 ssz-multiproofs.workspace = true
 guest-io = { workspace = true, features = ["builder"] }
-guests.workspace = true
+membership_builder.workspace = true
+balance_and_exits_builder.workspace = true
 
 alloy = { workspace = true }
 alloy-primitives = { workspace = true }
