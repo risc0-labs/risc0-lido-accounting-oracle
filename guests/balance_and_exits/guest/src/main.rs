@@ -13,11 +13,12 @@
 // limitations under the License.
 
 use alloy_primitives::B256;
+use alloy_sol_types::SolValue;
 use bitvec::prelude::*;
 use bitvec::vec::BitVec;
 use gindices::presets::mainnet::beacon_block as beacon_block_gindices;
 use gindices::presets::mainnet::beacon_state as beacon_state_gindices;
-use guest_io::balance_and_exits::{Input, Journal};
+use guest_io::balance_and_exits::Input;
 use guest_io::validator_membership::Journal as MembershipJounal;
 use membership_builder::VALIDATOR_MEMBERSHIP_ID;
 use risc0_zkvm::{guest::env, serde};
@@ -61,13 +62,14 @@ pub fn main() {
 
     let cl_balance = accumulate_balances(&mut values, &membership);
 
-    let journal = Journal {
-        block_root,
-        num_validators,
-        cl_balance,
-        num_exited_validators,
-    };
-    env::commit(&journal);
+    let withdrawal_vault_balance: u64 = 0; // TODO: Calculate withdrawal vault balance using Steel
+
+    // write the outputs in ABI packed compatible format
+    env::commit_slice(&block_root.abi_encode());
+    env::commit_slice(&cl_balance.abi_encode());
+    env::commit_slice(&withdrawal_vault_balance.abi_encode());
+    env::commit_slice(&num_validators.abi_encode());
+    env::commit_slice(&num_exited_validators.abi_encode());
 }
 
 fn get_slot<'a, I: Iterator<Item = (u64, &'a B256)>>(values: &mut I) -> u64 {

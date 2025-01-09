@@ -199,14 +199,6 @@ pub mod balance_and_exits {
             })
         }
     }
-
-    #[derive(Debug, serde::Serialize, serde::Deserialize)]
-    pub struct Journal {
-        pub block_root: B256,
-        pub cl_balance: u64,
-        pub num_validators: u64,
-        pub num_exited_validators: u64,
-    }
 }
 
 #[cfg(feature = "builder")]

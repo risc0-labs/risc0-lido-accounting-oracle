@@ -229,7 +229,7 @@ async fn build_aggregate_proof(
     input_path: Option<PathBuf>,
     out_path: PathBuf,
 ) -> Result<()> {
-    use guest_io::balance_and_exits::{Input, Journal};
+    use guest_io::balance_and_exits::Input;
 
     let input = if let Some(input_data) = input_path {
         tracing::info!("Reading input data from file: {:?}", input_data);
@@ -260,7 +260,7 @@ async fn build_aggregate_proof(
     let session_info = default_prover().prove(env, BALANCE_AND_EXITS_ELF)?;
     tracing::debug!(
         "program execution returned: {:?}",
-        session_info.receipt.journal.decode::<Journal>()?
+        session_info.receipt.journal
     );
     tracing::info!("total cycles: {}", session_info.stats.total_cycles);
 

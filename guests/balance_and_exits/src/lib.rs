@@ -68,12 +68,7 @@ mod tests {
 
         println!("Starting execution of the program");
         let session_info = default_executor().execute(env, super::BALANCE_AND_EXITS_ELF)?;
-        println!(
-            "program execution returned: {:?}",
-            session_info
-                .journal
-                .decode::<balance_and_exits::Journal>()?
-        );
+        println!("program execution returned: {:?}", session_info.journal);
         println!("total cycles: {}", session_info.cycles());
         Ok(())
     }

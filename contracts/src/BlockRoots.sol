@@ -3,7 +3,6 @@
 pragma solidity ^0.8.20;
 
 library BlockRoots {
-
     error TimestampOutOfRange();
     error NoBlockRootFound();
 
@@ -32,8 +31,7 @@ library BlockRoots {
         }
 
         while (currBlockTimestamp <= block.timestamp) {
-            (bool success, bytes memory result) =
-                BEACON_ROOTS.staticcall(abi.encode(currBlockTimestamp));
+            (bool success, bytes memory result) = BEACON_ROOTS.staticcall(abi.encode(currBlockTimestamp));
             if (success && result.length > 0) {
                 return abi.decode(result, (bytes32));
             }

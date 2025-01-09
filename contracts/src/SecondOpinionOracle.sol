@@ -21,12 +21,8 @@ import {ISecondOpinionOracle} from "./ISecondOpinionOracle.sol";
 import {BlockRoots} from "./BlockRoots.sol";
 import {ImageID} from "./ImageID.sol"; // auto-generated contract after running `cargo build`.
 
-/// @title A starter application using RISC Zero.
-/// @notice This basic application holds a number, guaranteed to be even.
-/// @dev This contract demonstrates one pattern for offloading the computation of an expensive
-///      or difficult to implement function to a RISC Zero guest running on the zkVM.
+/// @title LIP-23 Compatible Oracle implemented using RISC Zero
 contract SecondOpinionOracle is ISecondOpinionOracle {
-
     struct Report {
         uint256 clBalanceGwei;
         uint256 withdrawalVaultBalanceWei;
@@ -41,20 +37,26 @@ contract SecondOpinionOracle is ISecondOpinionOracle {
     bytes32 public constant imageId = ImageID.BALANCE_AND_EXITS_ID;
 
     /// @notice Oracle reports stored by refSlot.
-    mapping (uint256 => Report) public reports;
+    mapping(uint256 => Report) public reports;
 
     /// @notice Initialize the contract, binding it to a specified RISC Zero verifier.
     constructor(IRiscZeroVerifier _verifier) {
         verifier = _verifier;
     }
 
-    /// @notice Set the even number stored on the contract. Requires a RISC Zero proof that the number is even.
+    /// @notice Set an oracle report for a given slot by verifying the ZK proof
     function update(uint256 refSlot, Report calldata r, bytes calldata seal) public {
-        // retrieve the beacon block root for the given refslot
         bytes32 blockRoot = BlockRoots.findBlockRoot(refSlot);
-        
-        // Construct the expected journal data. Verify will fail if journal does not match.
-        bytes memory journal = abi.encode(0); // TODO: Encode the actual journal data for the report
+
+        bytes memory journal = abi.encodePacked(
+            (
+                blockRoot,
+                r.clBalanceGwei,
+                r.withdrawalVaultBalanceWei,
+                r.totalDepositedValidators,
+                r.totalExitedValidators,
+            )
+        );
         verifier.verify(seal, imageId, sha256(journal));
 
         // report is now considered valid for the given slot and can be stored
@@ -62,14 +64,24 @@ contract SecondOpinionOracle is ISecondOpinionOracle {
     }
 
     /// @notice Returns the number stored.
-    function getReport(uint256 refSlot) external view returns (
-        bool success,
-        uint256 clBalanceGwei,
-        uint256 withdrawalVaultBalanceWei,
-        uint256 totalDepositedValidators,
-        uint256 totalExitedValidators
-    ) {
+    function getReport(uint256 refSlot)
+        external
+        view
+        returns (
+            bool success,
+            uint256 clBalanceGwei,
+            uint256 withdrawalVaultBalanceWei,
+            uint256 totalDepositedValidators,
+            uint256 totalExitedValidators
+        )
+    {
         Report memory report = reports[refSlot];
-        return (report.clBalanceGwei != 0, report.clBalanceGwei, report.withdrawalVaultBalanceWei, report.totalDepositedValidators, report.totalExitedValidators);
+        return (
+            report.clBalanceGwei != 0,
+            report.clBalanceGwei,
+            report.withdrawalVaultBalanceWei,
+            report.totalDepositedValidators,
+            report.totalExitedValidators
+        );
     }
 }

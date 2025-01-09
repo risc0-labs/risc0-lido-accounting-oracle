@@ -115,8 +115,12 @@ jobs:
       - name: lint rust code
         run: cargo fmt --all --check
 
-      - name: lint guest rust code
-        working-directory: methods/guest
+      - name: lint membership guest rust code
+        working-directory: guests/membership/guest
+        run: cargo fmt --all --check
+
+      - name: lint balance_and_exits guest rust code
+        working-directory: guests/balance_and_exits/guest
         run: cargo fmt --all --check
 
       - name: lint cargo files
