@@ -91,7 +91,7 @@ pub mod validator_membership {
                     }),
                 );
 
-            let multiproof = build_with_versioned_state(proof_builder, &beacon_state)?;
+            let multiproof = build_with_versioned_state(proof_builder, beacon_state)?;
 
             let prior_membership = prior_beacon_state
                 .validators()
@@ -106,7 +106,7 @@ pub mod validator_membership {
                 current_state_root,
                 max_validator_index,
                 proof_type: ProofType::Continuation {
-                    prior_state_root: prior_beacon_state.hash_tree_root()?.into(),
+                    prior_state_root: prior_beacon_state.hash_tree_root()?,
                     prior_slot,
                     prior_max_validator_index,
                     prior_membership,
@@ -189,7 +189,7 @@ pub mod balance_and_exits {
                 }));
 
             let state_multiproof =
-                build_with_versioned_state(state_multiproof_builder, &beacon_state)?;
+                build_with_versioned_state(state_multiproof_builder, beacon_state)?;
 
             Ok(Self {
                 block_root,

@@ -149,12 +149,12 @@ fn calculate_compact_multi_merkle_root(
 
                 match left {
                     TreeNode::Leaf(node) => hasher.update(node),
-                    TreeNode::Computed(node) => hasher.update(&node),
+                    TreeNode::Computed(node) => hasher.update(node),
                     _ => panic!("Expected leaf"),
                 }
                 match right {
                     TreeNode::Leaf(node) => hasher.update(node),
-                    TreeNode::Computed(node) => hasher.update(&node),
+                    TreeNode::Computed(node) => hasher.update(node),
                     _ => panic!("Expected leaf"),
                 }
 

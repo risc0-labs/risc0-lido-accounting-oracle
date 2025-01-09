@@ -26,6 +26,12 @@ pub struct MultiproofBuilder {
     gindices: BTreeSet<GeneralizedIndex>,
 }
 
+impl Default for MultiproofBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MultiproofBuilder {
     pub fn new() -> Self {
         Self {
@@ -50,7 +56,7 @@ impl MultiproofBuilder {
     }
 
     /// Register an iterator of gindices to be included in the proof
-    pub fn with_gindices<'a, I>(mut self, gindices: I) -> Self
+    pub fn with_gindices<I>(mut self, gindices: I) -> Self
     where
         I: IntoIterator<Item = GeneralizedIndex>,
     {
