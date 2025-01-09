@@ -8,6 +8,7 @@ edition = "2021"
 guest-io = { path = "../../crates/guest-io", default-features = false }
 gindices = { path = "../../crates/gindices" }
 ssz-multiproofs = { path = "../../crates/ssz-multiproofs" }
+tracing-risc0 = { path = "../../crates/tracing-risc0" }
 
 bitvec = { version = "1", features = ["serde"] }
 serde = "1.0.215"
@@ -16,6 +17,10 @@ alloy-sol-types = { version = "0.7" }
 
 risc0-zkvm = { version = "1.2", default-features = false, features = ['std'] }
 risc0-zkp = { version = "1.2" }
+risc0-zkvm-platform = { version = "1.2", features = ["sys-getenv"] }
+
+tracing-subscriber = { version = "0.3.19" }
+tracing = "0.1.41"
 
 [patch.crates-io]
 # Placing this patch statement in the workspace Cargo.toml will add RISC Zero SHA-256 accelerator

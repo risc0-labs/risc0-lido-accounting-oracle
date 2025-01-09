@@ -17,7 +17,7 @@ mod beacon_client;
 use anyhow::Result;
 use beacon_client::BeaconClient;
 use clap::Parser;
-use guests::{BALANCE_AND_EXITS_ELF, VALIDATOR_MEMBERSHIP_ELF};
+use guests::{BALANCE_AND_EXITS_ELF, VALIDATOR_MEMBERSHIP_ELF, VALIDATOR_MEMBERSHIP_ID};
 use risc0_zkvm::{
     default_prover,
     guest::env,
@@ -143,7 +143,7 @@ impl MembershipProof {
     }
 }
 
-#[tracing::instrument]
+#[tracing::instrument(skip(beacon_rpc_url))]
 async fn build_membership_proof(
     beacon_rpc_url: Url,
     slot: u64,
@@ -162,7 +162,7 @@ async fn build_membership_proof(
 
     let mut env_builder = ExecutorEnv::builder();
 
-    if let Some(in_path) = in_path {
+    let env = if let Some(in_path) = in_path {
         tracing::info!("Reading input data from file: {:?}", in_path);
         let input_data = std::fs::read(in_path)?;
         let prior_proof: MembershipProof = bincode::deserialize(&input_data)?;
@@ -173,15 +173,18 @@ async fn build_membership_proof(
             prior_proof.max_validator_index,
             &beacon_state,
             max_validator_index,
+            VALIDATOR_MEMBERSHIP_ID,
         )?;
-        env_builder.write(&input)?;
-        env_builder.add_assumption(prior_proof.receipt);
+        env_builder
+            .add_assumption(prior_proof.receipt)
+            .write(&input)?
+            .build()?
     } else {
-        let input = Input::build_initial(&beacon_state, max_validator_index)?;
-        env_builder.write(&input)?;
+        let input =
+            Input::build_initial(&beacon_state, max_validator_index, VALIDATOR_MEMBERSHIP_ID)?;
+        env_builder.write(&input)?.build()?
     };
 
-    let env = env_builder.build()?;
     let session_info = default_prover().prove(env, VALIDATOR_MEMBERSHIP_ELF)?;
     tracing::debug!(
         "program execution returned: {:?}",

@@ -25,12 +25,15 @@ pub mod presets {
                 87
             }
 
-            pub fn state_roots(index: u64) -> u64 {
+            pub fn state_roots(slot: u64) -> u64 {
+                // note this only holds if slot < state.slot <= slot + SLOTS_PER_HISTORICAL_ROOT
+                // otherwise the state_root is not available in the state_roots list
+                let index = slot % SLOTS_PER_HISTORICAL_ROOT;
                 311296 + index
             }
 
             // balances are packed 4 u64s into a single 256 bit leaf hence the fiddling here.
-            // We can take advantage of this to shrink the proving work where there are adjacent lido validators!
+            // We can take advantage of this to shrink the proving work where adjacent balances are required
             pub fn validator_balance(validator_index: u64) -> u64 {
                 24189255811072 + (validator_index / 4)
             }
