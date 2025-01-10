@@ -18,6 +18,7 @@ use anyhow::Result;
 use balance_and_exits_builder::BALANCE_AND_EXITS_ELF;
 use beacon_client::BeaconClient;
 use clap::Parser;
+use ethereum_consensus::phase0::mainnet::{HistoricalBatch, SLOTS_PER_HISTORICAL_ROOT};
 use membership_builder::{VALIDATOR_MEMBERSHIP_ELF, VALIDATOR_MEMBERSHIP_ID};
 use risc0_zkvm::{
     default_prover,
@@ -29,10 +30,7 @@ use std::{
     io::Write,
     path::PathBuf,
 };
-use tracing_indicatif::IndicatifLayer;
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::EnvFilter;
+use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 use url::Url;
 
 /// CLI for generating and submitting Lido oracle proofs
@@ -91,11 +89,9 @@ enum MembershipCommand {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let indicatif_layer = IndicatifLayer::new();
     tracing_subscriber::registry()
+        .with(fmt::layer())
         .with(EnvFilter::from_default_env())
-        .with(tracing_subscriber::fmt::layer().with_writer(indicatif_layer.get_stderr_writer()))
-        .with(indicatif_layer)
         .init();
 
     let args = Args::parse();
@@ -185,8 +181,24 @@ async fn build_membership_proof(
     let mut env_builder = ExecutorEnv::builder();
 
     let env = if let Some(in_path) = in_path {
-        tracing::info!("Reading input data from file: {:?}", in_path);
+        tracing::info!("Reading prior proof from file: {:?}", in_path);
         let prior_proof: MembershipProof = bincode::deserialize(&read(in_path)?)?;
+
+        let hist_summary =
+            if beacon_state.slot() > prior_proof.slot + (SLOTS_PER_HISTORICAL_ROOT as u64) {
+                // this is a long range continuation and we need to provide an intermediate historical summary
+                tracing::info!("Long range continuation detected");
+                let inter_slot = prior_proof.slot / (SLOTS_PER_HISTORICAL_ROOT as u64)
+                    + (SLOTS_PER_HISTORICAL_ROOT as u64);
+                tracing::info!("Fetching intermediate state at slot: {}", inter_slot);
+                let inter_state = beacon_client.get_beacon_state(inter_slot).await?;
+                Some(HistoricalBatch {
+                    block_roots: inter_state.block_roots().clone(),
+                    state_roots: inter_state.state_roots().clone(),
+                })
+            } else {
+                None
+            };
 
         let prior_beacon_state = beacon_client.get_beacon_state(prior_proof.slot).await?;
         let input = Input::build_continuation(
@@ -194,6 +206,7 @@ async fn build_membership_proof(
             prior_proof.max_validator_index,
             &beacon_state,
             max_validator_index,
+            &hist_summary,
             VALIDATOR_MEMBERSHIP_ID,
         )?;
         env_builder

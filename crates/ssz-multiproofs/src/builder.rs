@@ -1,19 +1,12 @@
 use crate::multiproof::calculate_max_stack_depth;
 use crate::{Descriptor, Multiproof, Result};
+#[cfg(feature = "progress-bar")]
+use indicatif::{ParallelProgressIterator, ProgressBar, ProgressIterator, ProgressStyle};
 use rayon::prelude::*;
 use ssz_rs::prelude::{GeneralizedIndex, GeneralizedIndexable, Path, Prove};
 use ssz_rs::proofs::Prover;
 use std::collections::BTreeSet;
 use std::collections::HashSet;
-#[cfg(feature = "progress-bar")]
-use {
-    indicatif::{ParallelProgressIterator, ProgressBar, ProgressIterator, ProgressStyle},
-    tracing_indicatif::suspend_tracing_indicatif as suspend_tracing,
-};
-#[cfg(not(feature = "progress-bar"))]
-fn suspend_tracing<F: FnOnce() -> R, R>(f: F) -> R {
-    f()
-}
 
 /// The only way to create a multiproof is via this builder.
 ///
@@ -73,57 +66,47 @@ impl MultiproofBuilder {
 
         let tree = container.compute_tree()?;
 
-        let nodes: Vec<_> = suspend_tracing(|| {
-            #[cfg(feature = "progress-bar")]
-            {
-                proof_indices
-                    .par_iter()
-                    .progress_with(new_progress_bar(
-                        "Computing proof nodes",
-                        proof_indices.len(),
-                    ))
-                    .map(|index| {
-                        let mut prover = Prover::from(*index);
-                        prover.compute_proof_cached_tree(container, &tree)?;
-                        let proof = prover.into_proof();
-                        Ok(proof.leaf)
-                    })
-                    .collect::<Result<Vec<_>>>()
-            }
-            #[cfg(not(feature = "progress-bar"))]
-            {
-                proof_indices
-                    .par_iter()
-                    .map(|index| {
-                        let mut prover = Prover::from(*index);
-                        prover.compute_proof_cached_tree(container, &tree)?;
-                        let proof = prover.into_proof();
-                        Ok(proof.leaf)
-                    })
-                    .collect::<Result<Vec<_>>>()
-            }
-        })?;
+        #[cfg(feature = "progress-bar")]
+        let nodes: Vec<_> = proof_indices
+            .par_iter()
+            .progress_with(new_progress_bar(
+                "Computing proof nodes",
+                proof_indices.len(),
+            ))
+            .map(|index| {
+                let mut prover = Prover::from(*index);
+                prover.compute_proof_cached_tree(container, &tree)?;
+                let proof = prover.into_proof();
+                Ok(proof.leaf)
+            })
+            .collect::<Result<Vec<_>>>()?;
 
-        let value_mask = suspend_tracing(|| {
-            #[cfg(feature = "progress-bar")]
-            {
-                proof_indices
-                    .iter()
-                    .progress_with(new_progress_bar(
-                        "Computing value mask",
-                        proof_indices.len(),
-                    ))
-                    .map(|index| gindices.contains(index))
-                    .collect()
-            }
-            #[cfg(not(feature = "progress-bar"))]
-            {
-                proof_indices
-                    .iter()
-                    .map(|index| gindices.contains(index))
-                    .collect()
-            }
-        });
+        #[cfg(not(feature = "progress-bar"))]
+        let nodes: Vec<_> = proof_indices
+            .par_iter()
+            .map(|index| {
+                let mut prover = Prover::from(*index);
+                prover.compute_proof_cached_tree(container, &tree)?;
+                let proof = prover.into_proof();
+                Ok(proof.leaf)
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        #[cfg(feature = "progress-bar")]
+        let value_mask = proof_indices
+            .iter()
+            .progress_with(new_progress_bar(
+                "Computing value mask",
+                proof_indices.len(),
+            ))
+            .map(|index| gindices.contains(index))
+            .collect();
+
+        #[cfg(not(feature = "progress-bar"))]
+        let value_mask = proof_indices
+            .iter()
+            .map(|index| gindices.contains(index))
+            .collect();
 
         let descriptor = compute_proof_descriptor(&gindices)?;
         let max_stack_depth = calculate_max_stack_depth(&descriptor);

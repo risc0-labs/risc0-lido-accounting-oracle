@@ -4,17 +4,19 @@ use risc0_zkvm::sha::Digest;
 use ssz_multiproofs::Multiproof;
 #[cfg(feature = "builder")]
 use {
-    crate::error::Result,
-    ethereum_consensus::phase0::BeaconBlockHeader,
+    crate::error::{Error, Result},
+    ethereum_consensus::phase0::{presets::mainnet::HistoricalBatch, BeaconBlockHeader},
     ethereum_consensus::types::mainnet::BeaconState,
     gindices::presets::mainnet::{
         beacon_block as beacon_block_gindices, beacon_state as beacon_state_gindices,
+        beacon_state::SLOTS_PER_HISTORICAL_ROOT, historical_batch as historical_batch_gindices,
     },
     ssz_multiproofs::MultiproofBuilder,
     ssz_rs::prelude::*,
 };
 
 pub mod validator_membership {
+
     use super::*;
 
     #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -76,23 +78,20 @@ pub mod validator_membership {
             prior_max_validator_index: u64,
             beacon_state: &BeaconState,
             max_validator_index: u64,
+            historical_batch: &Option<HistoricalBatch>,
             self_program_id: D,
         ) -> Result<Self> {
             let state_root = beacon_state.hash_tree_root()?;
             let slot = beacon_state.slot();
             let prior_slot = prior_beacon_state.slot();
 
-            let proof_builder = MultiproofBuilder::new()
-                .with_gindex(beacon_state_gindices::state_roots(prior_slot).try_into()?)
-                .with_gindices(
-                    (prior_max_validator_index + 1..=max_validator_index).map(|i| {
-                        beacon_state_gindices::validator_withdrawal_credentials(i)
-                            .try_into()
-                            .unwrap()
-                    }),
-                );
-
-            let multiproof = build_with_versioned_state(proof_builder, beacon_state)?;
+            let mut proof_builder = MultiproofBuilder::new().with_gindices(
+                (prior_max_validator_index + 1..=max_validator_index).map(|i| {
+                    beacon_state_gindices::validator_withdrawal_credentials(i)
+                        .try_into()
+                        .unwrap()
+                }),
+            );
 
             let prior_membership = prior_beacon_state
                 .validators()
@@ -105,11 +104,29 @@ pub mod validator_membership {
 
             let cont_type = if slot == prior_slot {
                 ContinuationType::SameSlot
-            } else if slot <= prior_slot + beacon_state_gindices::SLOTS_PER_HISTORICAL_ROOT {
+            } else if slot <= prior_slot + SLOTS_PER_HISTORICAL_ROOT {
+                proof_builder = proof_builder
+                    .with_gindex(beacon_state_gindices::state_roots(prior_slot).try_into()?);
                 ContinuationType::ShortRange
+            } else if let Some(historical_batch) = historical_batch {
+                proof_builder = proof_builder.with_gindex(
+                    beacon_state_gindices::historical_summaries(
+                        (slot - prior_slot) / SLOTS_PER_HISTORICAL_ROOT,
+                    )
+                    .try_into()?,
+                );
+                let hist_summary_multiproof = MultiproofBuilder::new()
+                    .with_gindex(historical_batch_gindices::state_roots(prior_slot).try_into()?)
+                    .build(historical_batch)?;
+                ContinuationType::LongRange {
+                    slot,
+                    hist_summary_multiproof,
+                }
             } else {
-                todo!() // implement long range continuation
+                return Err(Error::MissingHistoricalBatch);
             };
+
+            let multiproof = build_with_versioned_state(proof_builder, beacon_state)?;
 
             Ok(Self {
                 self_program_id: self_program_id.into(),

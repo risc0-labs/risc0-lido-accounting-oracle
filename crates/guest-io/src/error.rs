@@ -12,6 +12,9 @@ pub enum Error {
 
     #[error("The fork version is not currently supported")]
     UnsupportedFork,
+
+    #[error("Historical batch not provided but it is required for proving states are linked over the number of slots they span")]
+    MissingHistoricalBatch,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

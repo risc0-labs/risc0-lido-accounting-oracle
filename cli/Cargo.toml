@@ -30,6 +30,4 @@ reqwest-cache = "0.1.3"
 reqwest-middleware = "0.4.0"
 http-cache-reqwest = "0.15.0"
 bytemuck.workspace = true
-indicatif = "0.17.9"
-tracing-indicatif = "0.3.8"
 bincode.workspace = true
