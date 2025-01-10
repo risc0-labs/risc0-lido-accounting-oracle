@@ -79,6 +79,7 @@ pub mod validator_membership {
             self_program_id: D,
         ) -> Result<Self> {
             let state_root = beacon_state.hash_tree_root()?;
+            let slot = beacon_state.slot();
             let prior_slot = prior_beacon_state.slot();
 
             let proof_builder = MultiproofBuilder::new()
@@ -101,6 +102,15 @@ pub mod validator_membership {
                     v.withdrawal_credentials.as_slice() == crate::WITHDRAWAL_CREDENTIALS.as_slice()
                 })
                 .collect::<BitVec<u32, Lsb0>>();
+
+            let cont_type = if slot == prior_slot {
+                ContinuationType::SameSlot
+            } else if slot <= prior_slot + beacon_state_gindices::SLOTS_PER_HISTORICAL_ROOT {
+                ContinuationType::ShortRange
+            } else {
+                todo!() // implement long range continuation
+            };
+
             Ok(Self {
                 self_program_id: self_program_id.into(),
                 state_root,
@@ -110,6 +120,7 @@ pub mod validator_membership {
                     prior_slot,
                     prior_max_validator_index,
                     prior_membership,
+                    cont_type,
                 },
                 multiproof,
             })

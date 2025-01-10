@@ -108,12 +108,11 @@ pub fn main() {
     }
 
     for validator_index in start_validator_index..=max_validator_index {
-        let expected_gindex =
-            beacon_state_gindices::validator_withdrawal_credentials(validator_index);
-        let (gindex, value) = values
-            .next()
-            .expect("Missing withdrawal_credentials value in multiproof");
-        assert_eq!(gindex, expected_gindex);
+        let value = values
+            .next_assert_gindex(beacon_state_gindices::validator_withdrawal_credentials(
+                validator_index,
+            ))
+            .unwrap();
         membership.push(value == &WITHDRAWAL_CREDENTIALS);
     }
 
