@@ -56,13 +56,14 @@ mod tests {
             }
         }
 
-        pub fn with_prior_state(&mut self, prior_state: &BeaconState) -> Option<HistoricalBatch> {
+        pub fn with_prior_state(
+            &mut self,
+            prior_state: &ethereum_consensus::types::mainnet::BeaconState,
+        ) -> Option<HistoricalBatch> {
             let slot = self.inner.slot;
-            let prior_slot = prior_state.slot;
+            let prior_slot = prior_state.slot();
             assert!(slot > prior_slot, "prior_state.slot must be less than slot");
-            let index: usize = (prior_state.slot % SLOTS_PER_HISTORICAL_ROOT)
-                .try_into()
-                .unwrap();
+            let index: usize = (prior_slot % SLOTS_PER_HISTORICAL_ROOT).try_into().unwrap();
 
             // if a short range add the state root to the state_roots list
             if slot <= prior_slot + SLOTS_PER_HISTORICAL_ROOT {
@@ -84,8 +85,8 @@ mod tests {
             }
         }
 
-        fn build(self) -> BeaconState {
-            self.inner
+        fn build(self) -> ethereum_consensus::types::mainnet::BeaconState {
+            ethereum_consensus::types::mainnet::BeaconState::Capella(self.inner)
         }
     }
 
@@ -96,10 +97,10 @@ mod tests {
 
         let mut b = TestStateBuilder::new(10);
         b.with_validators(n_validators);
-        let beacon_state = b.build();
+        let s = b.build();
 
         let input = validator_membership::Input::build_initial(
-            &ethereum_consensus::types::mainnet::BeaconState::Capella(beacon_state),
+            &s,
             max_validator_index as u64,
             super::VALIDATOR_MEMBERSHIP_ID,
         )?;
@@ -127,18 +128,15 @@ mod tests {
         b.with_validators(n_validators);
         let s1 = b.build();
 
-        let input = validator_membership::Input::build_initial(
-            &ethereum_consensus::types::mainnet::BeaconState::Capella(s1.clone()),
-            500,
-            super::VALIDATOR_MEMBERSHIP_ID,
-        )?;
+        let input =
+            validator_membership::Input::build_initial(&s1, 500, super::VALIDATOR_MEMBERSHIP_ID)?;
         let env = ExecutorEnv::builder().write(&input)?.build()?;
         let session_info = default_executor().execute(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
 
         let input = validator_membership::Input::build_continuation(
-            &ethereum_consensus::types::mainnet::BeaconState::Capella(s1.clone()),
+            &s1,
             500,
-            &ethereum_consensus::types::mainnet::BeaconState::Capella(s1),
+            &s1,
             max_validator_index as u64,
             &None,
             super::VALIDATOR_MEMBERSHIP_ID,
@@ -168,18 +166,15 @@ mod tests {
         b.with_prior_state(&s1);
         let s2 = b.build();
 
-        let input = validator_membership::Input::build_initial(
-            &ethereum_consensus::types::mainnet::BeaconState::Capella(s1.clone()),
-            500,
-            super::VALIDATOR_MEMBERSHIP_ID,
-        )?;
+        let input =
+            validator_membership::Input::build_initial(&s1, 500, super::VALIDATOR_MEMBERSHIP_ID)?;
         let env = ExecutorEnv::builder().write(&input)?.build()?;
         let session_info = default_executor().execute(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
 
         let input = validator_membership::Input::build_continuation(
-            &ethereum_consensus::types::mainnet::BeaconState::Capella(s1.clone()),
+            &s1.clone(),
             500,
-            &ethereum_consensus::types::mainnet::BeaconState::Capella(s2),
+            &s2,
             max_validator_index as u64,
             &None,
             super::VALIDATOR_MEMBERSHIP_ID,
@@ -188,10 +183,9 @@ mod tests {
             .add_assumption(session_info.receipt_claim.unwrap())
             .write(&input)?
             .build()?;
+
         let session_info = default_executor().execute(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
-
         assert_eq!(session_info.exit_code, ExitCode::Halted(0));
-
         Ok(())
     }
 
@@ -209,18 +203,15 @@ mod tests {
         let hist_batch = b.with_prior_state(&s1);
         let s2 = b.build();
 
-        let input = validator_membership::Input::build_initial(
-            &ethereum_consensus::types::mainnet::BeaconState::Capella(s1.clone()),
-            500,
-            super::VALIDATOR_MEMBERSHIP_ID,
-        )?;
+        let input =
+            validator_membership::Input::build_initial(&s1, 500, super::VALIDATOR_MEMBERSHIP_ID)?;
         let env = ExecutorEnv::builder().write(&input)?.build()?;
         let session_info = default_executor().execute(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
 
         let input = validator_membership::Input::build_continuation(
-            &ethereum_consensus::types::mainnet::BeaconState::Capella(s1.clone()),
+            &s1,
             500,
-            &ethereum_consensus::types::mainnet::BeaconState::Capella(s2),
+            &s2,
             max_validator_index as u64,
             &hist_batch,
             super::VALIDATOR_MEMBERSHIP_ID,
@@ -229,10 +220,9 @@ mod tests {
             .add_assumption(session_info.receipt_claim.unwrap())
             .write(&input)?
             .build()?;
+
         let session_info = default_executor().execute(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
-
         assert_eq!(session_info.exit_code, ExitCode::Halted(0));
-
         Ok(())
     }
 }
