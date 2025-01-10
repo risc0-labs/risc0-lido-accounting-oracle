@@ -15,6 +15,12 @@ pub enum Error {
 
     #[error("Root calculated by proof does not match expected root")]
     RootMismatch,
+
+    #[error("attempted to read a value from a multiproof but none remain")]
+    MissingValue,
+
+    #[error("requested a value with gindex {} but got gindex {}", .expected, .actual)]
+    GIndexMismatch { expected: u64, actual: u64 },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

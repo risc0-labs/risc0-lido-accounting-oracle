@@ -13,8 +13,14 @@
 // limitations under the License.
 
 use bitvec::prelude::*;
-use gindices::presets::mainnet::beacon_state as beacon_state_gindices;
-use guest_io::validator_membership::{Input, Journal, ProofType};
+use gindices::presets::mainnet::beacon_state::{
+    self as beacon_state_gindices, SLOTS_PER_HISTORICAL_ROOT,
+};
+use gindices::presets::mainnet::historical_batch as historical_batch_gindices;
+use guest_io::validator_membership::{
+    ContinuationType::{LongRange, SameSlot, ShortRange},
+    Input, Journal, ProofType,
+};
 use guest_io::WITHDRAWAL_CREDENTIALS;
 use tracing_risc0::Risc0Formatter;
 use tracing_subscriber::fmt::format::FmtSpan;
@@ -31,7 +37,7 @@ pub fn main() {
 
     let Input {
         multiproof,
-        current_state_root,
+        state_root,
         proof_type,
         self_program_id,
         max_validator_index,
@@ -39,7 +45,7 @@ pub fn main() {
 
     // verify the multi-proof which verifies leaf values
     multiproof
-        .verify(&current_state_root)
+        .verify(&state_root)
         .expect("Failed to verify multiproof");
     let mut values = multiproof.values();
 
@@ -57,17 +63,37 @@ pub fn main() {
         prior_slot,
         prior_max_validator_index,
         prior_membership,
+        cont_type,
     } = proof_type
     {
-        // if this is not a continuation within the same slot then the prior state root should be available
-        // within the current state
-        if prior_state_root != current_state_root {
-            // Verify the pre-state requirement
-            let (gindex, value) = values
-                .next()
-                .expect("Missing state_root value in multiproof");
-            assert_eq!(gindex, beacon_state_gindices::state_roots(prior_slot));
-            assert_eq!(value, &prior_state_root);
+        match cont_type {
+            SameSlot => {
+                assert_eq!(state_root, prior_state_root);
+            }
+            ShortRange => {
+                let stored_root = values
+                    .next_assert_gindex(beacon_state_gindices::state_roots(prior_slot))
+                    .unwrap();
+                assert_eq!(stored_root, &prior_state_root);
+            }
+            LongRange {
+                slot,
+                hist_summary_multiproof,
+            } => {
+                let historical_summary_root = values
+                    .next_assert_gindex(beacon_state_gindices::historical_summaries(
+                        (slot - prior_slot) / SLOTS_PER_HISTORICAL_ROOT,
+                    ))
+                    .unwrap();
+                hist_summary_multiproof
+                    .verify(&historical_summary_root)
+                    .expect("Failed to verify historical summary multiproof given the root in the current state");
+                let stored_root = hist_summary_multiproof
+                    .values()
+                    .next_assert_gindex(historical_batch_gindices::state_roots(prior_slot))
+                    .unwrap();
+                assert_eq!(stored_root, &prior_state_root);
+            }
         }
 
         // Verify the prior membership proof
@@ -93,7 +119,7 @@ pub fn main() {
 
     let journal = Journal {
         self_program_id,
-        state_root: current_state_root,
+        state_root,
         max_validator_index,
         membership,
     };

@@ -50,10 +50,12 @@ impl Multiproof {
     }
 
     /// Creates an iterator the values in this proof along with their gindices
-    pub fn values(&self) -> impl Iterator<Item = (u64, &Node)> {
-        self.nodes()
-            .zip(self.value_mask.iter())
-            .filter_map(|(node, is_value)| if *is_value { Some(node) } else { None })
+    pub fn values(&self) -> ValueIterator<impl Iterator<Item = (u64, &Node)>> {
+        ValueIterator::new(
+            self.nodes()
+                .zip(self.value_mask.iter())
+                .filter_map(|(node, is_value)| if *is_value { Some(node) } else { None }),
+        )
     }
 
     /// Finds the node corresponding to a given gindex.
@@ -65,6 +67,46 @@ impl Multiproof {
         self.values()
             .find(|(g, _)| *g == gindex)
             .map(|(_, node)| node)
+    }
+}
+
+/// An iterator over the values in a multiproof along with their gindices
+pub struct ValueIterator<'a, I>
+where
+    I: Iterator<Item = (u64, &'a Node)>,
+{
+    inner: I,
+}
+
+impl<'a, I> ValueIterator<'a, I>
+where
+    I: Iterator<Item = (u64, &'a Node)>,
+{
+    fn new(inner: I) -> Self {
+        ValueIterator { inner }
+    }
+
+    pub fn next_assert_gindex(&mut self, gindex: u64) -> Result<&'a Node> {
+        let (g, node) = self.inner.next().ok_or(Error::MissingValue)?;
+        if g == gindex {
+            Ok(node)
+        } else {
+            Err(Error::GIndexMismatch {
+                expected: gindex,
+                actual: g,
+            })
+        }
+    }
+}
+
+impl<'a, I> Iterator for ValueIterator<'a, I>
+where
+    I: Iterator<Item = (u64, &'a Node)>,
+{
+    type Item = (u64, &'a Node);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
     }
 }
 

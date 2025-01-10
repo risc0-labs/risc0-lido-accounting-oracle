@@ -24,7 +24,7 @@ pub mod validator_membership {
         pub self_program_id: Digest,
 
         /// The state root of the state used in the current proof
-        pub current_state_root: B256,
+        pub state_root: B256,
 
         /// the top validator index the membership proof will be extended to
         pub max_validator_index: u64,
@@ -44,7 +44,7 @@ pub mod validator_membership {
             max_validator_index: u64,
             self_program_id: D,
         ) -> Result<Self> {
-            let current_state_root = beacon_state.hash_tree_root()?;
+            let state_root = beacon_state.hash_tree_root()?;
 
             let proof_builder =
                 MultiproofBuilder::new().with_gindices((0..=max_validator_index).map(|i| {
@@ -57,7 +57,7 @@ pub mod validator_membership {
 
             Ok(Self {
                 self_program_id: self_program_id.into(),
-                current_state_root,
+                state_root,
                 max_validator_index,
                 proof_type: ProofType::Initial,
                 multiproof,
@@ -78,7 +78,7 @@ pub mod validator_membership {
             max_validator_index: u64,
             self_program_id: D,
         ) -> Result<Self> {
-            let current_state_root = beacon_state.hash_tree_root()?;
+            let state_root = beacon_state.hash_tree_root()?;
             let prior_slot = prior_beacon_state.slot();
 
             let proof_builder = MultiproofBuilder::new()
@@ -103,7 +103,7 @@ pub mod validator_membership {
                 .collect::<BitVec<u32, Lsb0>>();
             Ok(Self {
                 self_program_id: self_program_id.into(),
-                current_state_root,
+                state_root,
                 max_validator_index,
                 proof_type: ProofType::Continuation {
                     prior_state_root: prior_beacon_state.hash_tree_root()?,
@@ -124,6 +124,30 @@ pub mod validator_membership {
             prior_slot: u64,
             prior_max_validator_index: u64,
             prior_membership: BitVec<u32, Lsb0>,
+            cont_type: ContinuationType,
+        },
+    }
+
+    /// Continuations proofs are slightly different depending on how far back the prior proof is.
+    /// There are three possibilities here. Either
+    /// 1. They are in the same slot
+    ///     Just prove the prior state root is the same as the current state root
+    /// 2. prior_slot < slot <= prior_slot + SLOTS_PER_HISTORICAL_ROOT
+    ///    Prove the prior state root is in the state_roots list of the current state at (prior_slot % SLOTS_PER_HISTORICAL_ROOT)
+    /// 3. slot > prior_slot + SLOTS_PER_HISTORICAL_ROOT
+    ///     This requires doing an extra step. In this case prove an entry in the historical_summaries list of the current state
+    ///     and then prove the prior state root is in the state_roots list of the historical summary.
+    ///    The element in the historical_summaries list is at index ((slot - prior_slot) // SLOTS_PER_HISTORICAL_ROOT)
+    ///    and the index in the state_roots list is (prior_slot % SLOTS_PER_HISTORICAL_ROOT).
+    ///    This also requires fetching the state at slot ( prior_slot // SLOTS_PER_HISTORICAL_ROOT + SLOTS_PER_HISTORICAL_ROOT ) to retrieve its state_roots list and build a merkle proof into it
+    ///
+    #[derive(Debug, serde::Serialize, serde::Deserialize)]
+    pub enum ContinuationType {
+        SameSlot,
+        ShortRange,
+        LongRange {
+            slot: u64,
+            hist_summary_multiproof: Multiproof,
         },
     }
 
