@@ -37,6 +37,10 @@ pub mod presets {
             // The root of a historical summary is the same as a historical batch
             // so this can be used to verify historical batch proofs
             pub fn historical_summaries(slot: u64) -> u64 {
+                assert!(
+                    slot >= CAPELLA_FORK_SLOT,
+                    "Historical summaries are only available from Capella fork onwards"
+                );
                 let index = (slot - CAPELLA_FORK_SLOT) / SLOTS_PER_HISTORICAL_ROOT;
                 1979711488 + index
             }
@@ -70,6 +74,7 @@ pub mod presets {
 #[cfg(test)]
 mod test {
     use super::*;
+    use presets::mainnet::beacon_state::SLOTS_PER_HISTORICAL_ROOT;
     use ssz_rs::prelude::*;
 
     #[test]
@@ -133,13 +138,15 @@ mod test {
 
     #[test]
     fn historical_summaries() -> anyhow::Result<()> {
-        for index in 0_usize..presets::mainnet::beacon_state::SLOTS_PER_HISTORICAL_ROOT as usize {
+        for index in 0_u64..10 {
+            let slot = presets::mainnet::beacon_state::CAPELLA_FORK_SLOT
+                + (index * SLOTS_PER_HISTORICAL_ROOT);
             assert_eq!(
                 ethereum_consensus::capella::presets::mainnet::BeaconState::generalized_index(&[
                     "historical_summaries".into(),
-                    index.into(),
+                    (index as usize).into(),
                 ])? as u64,
-                presets::mainnet::beacon_state::historical_summaries(index as u64)
+                presets::mainnet::beacon_state::historical_summaries(slot as u64)
             );
         }
         Ok(())

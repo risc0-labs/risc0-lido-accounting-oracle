@@ -21,7 +21,7 @@ mod tests {
         BeaconState, HistoricalBatch, HistoricalSummary, Validator,
     };
     use ethereum_consensus::ssz::prelude::*;
-    use gindices::presets::mainnet::beacon_state::SLOTS_PER_HISTORICAL_ROOT;
+    use gindices::presets::mainnet::beacon_state::{CAPELLA_FORK_SLOT, SLOTS_PER_HISTORICAL_ROOT};
     use guest_io::{validator_membership, WITHDRAWAL_CREDENTIALS};
     use risc0_zkvm::{default_executor, ExecutorEnv, ExitCode};
 
@@ -77,10 +77,11 @@ mod tests {
                     block_summary_root: batch.block_roots.hash_tree_root().unwrap(),
                     state_summary_root: batch.state_roots.hash_tree_root().unwrap(),
                 };
-                self.inner.historical_summaries.extend(
-                    std::iter::repeat(summary)
-                        .take(((slot - prior_slot) / SLOTS_PER_HISTORICAL_ROOT) as usize + 1),
-                );
+                self.inner
+                    .historical_summaries
+                    .extend(std::iter::repeat(summary).take(
+                        ((prior_slot - CAPELLA_FORK_SLOT) / SLOTS_PER_HISTORICAL_ROOT) as usize + 1,
+                    ));
                 Some(batch)
             }
         }
@@ -95,7 +96,7 @@ mod tests {
         let n_validators = 1001;
         let max_validator_index = n_validators - 1;
 
-        let mut b = TestStateBuilder::new(10);
+        let mut b = TestStateBuilder::new(CAPELLA_FORK_SLOT);
         b.with_validators(n_validators);
         let s = b.build();
 
@@ -124,7 +125,7 @@ mod tests {
         let n_validators = 1001;
         let max_validator_index = n_validators - 1;
 
-        let mut b = TestStateBuilder::new(10);
+        let mut b = TestStateBuilder::new(CAPELLA_FORK_SLOT);
         b.with_validators(n_validators);
         let s1 = b.build();
 
@@ -157,11 +158,11 @@ mod tests {
         let n_validators = 1001;
         let max_validator_index = n_validators - 1;
 
-        let mut b = TestStateBuilder::new(10);
+        let mut b = TestStateBuilder::new(CAPELLA_FORK_SLOT);
         b.with_validators(n_validators);
         let s1 = b.build();
 
-        let mut b = TestStateBuilder::new(20);
+        let mut b = TestStateBuilder::new(CAPELLA_FORK_SLOT + 20);
         b.with_validators(n_validators + 10);
         b.with_prior_state(&s1);
         let s2 = b.build();
@@ -194,11 +195,11 @@ mod tests {
         let n_validators = 1001;
         let max_validator_index = n_validators - 1;
 
-        let mut b = TestStateBuilder::new(10);
+        let mut b = TestStateBuilder::new(CAPELLA_FORK_SLOT);
         b.with_validators(n_validators);
         let s1 = b.build();
 
-        let mut b = TestStateBuilder::new(20 + SLOTS_PER_HISTORICAL_ROOT + 1);
+        let mut b = TestStateBuilder::new(CAPELLA_FORK_SLOT + SLOTS_PER_HISTORICAL_ROOT + 1);
         b.with_validators(n_validators + 10);
         let hist_batch = b.with_prior_state(&s1);
         let s2 = b.build();
