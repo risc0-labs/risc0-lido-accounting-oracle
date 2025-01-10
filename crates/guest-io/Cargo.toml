@@ -9,7 +9,7 @@ builder = ["ssz-multiproofs/builder", "dep:ssz_rs", "dep:ethereum-consensus", "d
 progress-bar = ["ssz-multiproofs/progress-bar"]
 
 [dependencies]
-ssz-multiproofs = { workspace = true, default-features = false }
+ssz-multiproofs = { workspace = true }
 
 serde.workspace = true
 alloy-primitives.workspace = true
