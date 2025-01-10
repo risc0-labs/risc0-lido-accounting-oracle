@@ -161,9 +161,10 @@ pub mod validator_membership {
     /// 3. slot > prior_slot + SLOTS_PER_HISTORICAL_ROOT
     ///     This requires doing an extra step. In this case prove an entry in the historical_summaries list of the current state
     ///     and then prove the prior state root is in the state_roots list of the historical summary.
-    ///    The element in the historical_summaries list is at index ((slot - prior_slot) // SLOTS_PER_HISTORICAL_ROOT)
+    ///    The element in the historical_summaries list is at index (prior_slot - CAPELLA_FORK_SLOT) / SLOTS_PER_HISTORICAL_ROOT
     ///    and the index in the state_roots list is (prior_slot % SLOTS_PER_HISTORICAL_ROOT).
-    ///    This also requires fetching the state at slot ( prior_slot // SLOTS_PER_HISTORICAL_ROOT + SLOTS_PER_HISTORICAL_ROOT ) to retrieve its state_roots list and build a merkle proof into it
+    ///    This also requires fetching the state at slot ( (prior_slot / SLOTS_PER_HISTORICAL_ROOT + 1) * SLOTS_PER_HISTORICAL_ROOT )
+    ///    to retrieve its state_roots list and build a merkle proof into it
     ///
     #[derive(Debug, serde::Serialize, serde::Deserialize)]
     pub enum ContinuationType {
