@@ -110,16 +110,12 @@ pub mod validator_membership {
                 ContinuationType::ShortRange
             } else if let Some(historical_batch) = historical_batch {
                 proof_builder = proof_builder.with_gindex(
-                    beacon_state_gindices::historical_summaries(
-                        (slot - prior_slot) / SLOTS_PER_HISTORICAL_ROOT,
-                    )
-                    .try_into()?,
+                    beacon_state_gindices::historical_summaries(prior_slot).try_into()?,
                 );
                 let hist_summary_multiproof = MultiproofBuilder::new()
                     .with_gindex(historical_batch_gindices::state_roots(prior_slot).try_into()?)
                     .build(historical_batch)?;
                 ContinuationType::LongRange {
-                    slot,
                     hist_summary_multiproof,
                 }
             } else {
@@ -173,10 +169,7 @@ pub mod validator_membership {
     pub enum ContinuationType {
         SameSlot,
         ShortRange,
-        LongRange {
-            slot: u64,
-            hist_summary_multiproof: Multiproof,
-        },
+        LongRange { hist_summary_multiproof: Multiproof },
     }
 
     #[derive(Debug, serde::Serialize, serde::Deserialize)]

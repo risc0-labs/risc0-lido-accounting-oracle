@@ -188,8 +188,8 @@ async fn build_membership_proof(
             if beacon_state.slot() > prior_proof.slot + (SLOTS_PER_HISTORICAL_ROOT as u64) {
                 // this is a long range continuation and we need to provide an intermediate historical summary
                 tracing::info!("Long range continuation detected");
-                let inter_slot = prior_proof.slot / (SLOTS_PER_HISTORICAL_ROOT as u64)
-                    + (SLOTS_PER_HISTORICAL_ROOT as u64);
+                let inter_slot = (prior_proof.slot / (SLOTS_PER_HISTORICAL_ROOT as u64) + 1)
+                    * (SLOTS_PER_HISTORICAL_ROOT as u64);
                 tracing::info!("Fetching intermediate state at slot: {}", inter_slot);
                 let inter_state = beacon_client.get_beacon_state(inter_slot).await?;
                 Some(HistoricalBatch {

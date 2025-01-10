@@ -77,13 +77,12 @@ pub fn main() {
                 assert_eq!(stored_root, &prior_state_root);
             }
             LongRange {
-                slot,
                 hist_summary_multiproof,
             } => {
                 let historical_summary_root =
                     multiproof // using a get here for now but this does cause an extra iteration through the values :(
                         .get(beacon_state_gindices::historical_summaries(
-                            (slot - prior_slot) / SLOTS_PER_HISTORICAL_ROOT,
+                            prior_slot,
                         ))
                         .unwrap();
                 hist_summary_multiproof

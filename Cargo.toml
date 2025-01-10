@@ -39,7 +39,6 @@ tracing = "0.1.41"
 
 [profile.release]
 debug = 1
-lto = true
 
 [patch."https://github.com/ralexstokes/ssz-rs"]
 # Get the merkle tree empty node virtualization so non-trivial merkle trees actually fit in memory

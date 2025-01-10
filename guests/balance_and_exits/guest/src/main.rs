@@ -22,6 +22,7 @@ use guest_io::balance_and_exits::Input;
 use guest_io::validator_membership::Journal as MembershipJounal;
 use membership_builder::VALIDATOR_MEMBERSHIP_ID;
 use risc0_zkvm::{guest::env, serde};
+use ssz_multiproofs::ValueIterator;
 use tracing_risc0::Risc0Formatter;
 use tracing_subscriber::fmt::format::FmtSpan;
 
@@ -72,24 +73,28 @@ pub fn main() {
     env::commit_slice(&num_exited_validators.abi_encode());
 }
 
-fn get_slot<'a, I: Iterator<Item = (u64, &'a B256)>>(values: &mut I) -> u64 {
-    let (gindex, slot) = values.next().expect("Missing slot in multiproof");
-    assert_eq!(gindex, beacon_block_gindices::slot());
+fn get_slot<'a, I: Iterator<Item = (u64, &'a B256)>>(values: &mut ValueIterator<'a, I>) -> u64 {
+    let slot = values
+        .next_assert_gindex(beacon_block_gindices::slot())
+        .unwrap();
     u64_from_b256(slot, 0)
 }
 
-fn get_state_root<'a, I: Iterator<Item = (u64, &'a B256)>>(values: &mut I) -> &'a B256 {
-    let (gindex, state_root) = values.next().expect("Missing state_root in multiproof");
-    assert_eq!(gindex, beacon_block_gindices::state_root());
-    state_root
+fn get_state_root<'a, I: Iterator<Item = (u64, &'a B256)>>(
+    values: &mut ValueIterator<'a, I>,
+) -> &'a B256 {
+    values
+        .next_assert_gindex(beacon_block_gindices::state_root())
+        .unwrap()
 }
 
-fn get_validator_count<'a, I: Iterator<Item = (u64, &'a B256)>>(values: &mut I) -> u64 {
-    let (gindex, slot) = values
-        .next()
-        .expect("Missing validator_count in multiproof");
-    assert_eq!(gindex, beacon_state_gindices::validator_count());
-    u64_from_b256(slot, 0)
+fn get_validator_count<'a, I: Iterator<Item = (u64, &'a B256)>>(
+    values: &mut ValueIterator<'a, I>,
+) -> u64 {
+    let validator_count = values
+        .next_assert_gindex(beacon_state_gindices::validator_count())
+        .unwrap();
+    u64_from_b256(validator_count, 0)
 }
 
 #[tracing::instrument(skip(membership))]
@@ -107,7 +112,7 @@ fn verify_membership(state_root: &B256, membership: &BitVec<u32, Lsb0>, validato
 
 #[tracing::instrument(skip(values, membership))]
 fn count_exited_validators<'a, I: Iterator<Item = (u64, &'a B256)>>(
-    values: &mut I,
+    values: &mut ValueIterator<'a, I>,
     membership: &BitVec<u32, Lsb0>,
     slot: u64,
 ) -> u64 {
@@ -115,11 +120,11 @@ fn count_exited_validators<'a, I: Iterator<Item = (u64, &'a B256)>>(
     let mut num_exited_validators = 0;
     // Iterate the validator exit epochs
     for validator_index in membership.iter_ones() {
-        let expeted_gindex = beacon_state_gindices::validator_exit_epoch(validator_index as u64);
-        let (gindex, value) = values
-            .next()
-            .expect("Missing validator_exit_epoch value in multiproof");
-        assert_eq!(gindex, expeted_gindex);
+        let value = values
+            .next_assert_gindex(beacon_state_gindices::validator_exit_epoch(
+                validator_index as u64,
+            ))
+            .unwrap();
         if u64_from_b256(&value, 0) <= current_epoch {
             num_exited_validators += 1;
         }
@@ -129,7 +134,7 @@ fn count_exited_validators<'a, I: Iterator<Item = (u64, &'a B256)>>(
 
 #[tracing::instrument(skip(values, membership))]
 fn accumulate_balances<'a, I: Iterator<Item = (u64, &'a B256)>>(
-    values: &mut I,
+    values: &mut ValueIterator<'a, I>,
     membership: &BitVec<u32, Lsb0>,
 ) -> u64 {
     // accumulate the balances but iterating over the membership bitvec

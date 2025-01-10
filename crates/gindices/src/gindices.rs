@@ -16,6 +16,7 @@ pub mod presets {
         pub mod beacon_state {
             pub const SLOTS_PER_HISTORICAL_ROOT: u64 = 8192;
             pub const VALIDATOR_REGISTRY_LIMIT: u64 = 1099511627776;
+            pub const CAPELLA_FORK_SLOT: u64 = 6209536;
 
             pub fn slot() -> u64 {
                 34
@@ -35,7 +36,8 @@ pub mod presets {
             // Only present in Capella and later
             // The root of a historical summary is the same as a historical batch
             // so this can be used to verify historical batch proofs
-            pub fn historical_summaries(index: u64) -> u64 {
+            pub fn historical_summaries(slot: u64) -> u64 {
+                let index = (slot - CAPELLA_FORK_SLOT) / SLOTS_PER_HISTORICAL_ROOT;
                 1979711488 + index
             }
 
