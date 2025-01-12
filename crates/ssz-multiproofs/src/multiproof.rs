@@ -19,10 +19,10 @@ pub struct Multiproof {
     pub(crate) nodes: Vec<Node>,
 
     /// mask indicating which nodes are values (1) or proof supporting nodes (0)
-    pub(crate) value_mask: BitVec<u8, Msb0>,
+    pub(crate) value_mask: BitVec<u32, Msb0>,
 
     /// bitvector describing the shape of the proof. See https://github.com/ethereum/consensus-specs/pull/3148
-    pub(crate) descriptor: BitVec<u8, Msb0>,
+    pub(crate) descriptor: Descriptor,
 
     /// hint for the depth of the stack needed to verify this proof, useful for preallocation and computing this can be done outside the ZKVM
     pub(crate) max_stack_depth: usize,
