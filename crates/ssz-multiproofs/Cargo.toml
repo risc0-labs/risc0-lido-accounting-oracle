@@ -16,6 +16,7 @@ risc0-zkvm.workspace = true
 bitvec.workspace = true
 thiserror = "2.0.6"
 tracing.workspace = true
+rkyv = "0.8.9"
 
 # Optional dependencies for builder feature
 ssz_rs = { workspace = true, optional = true }

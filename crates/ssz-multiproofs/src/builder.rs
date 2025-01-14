@@ -77,7 +77,7 @@ impl MultiproofBuilder {
                 let mut prover = Prover::from(*index);
                 prover.compute_proof_cached_tree(container, &tree)?;
                 let proof = prover.into_proof();
-                Ok(proof.leaf)
+                Ok(proof.leaf.0)
             })
             .collect::<Result<Vec<_>>>()?;
 
@@ -88,7 +88,7 @@ impl MultiproofBuilder {
                 let mut prover = Prover::from(*index);
                 prover.compute_proof_cached_tree(container, &tree)?;
                 let proof = prover.into_proof();
-                Ok(proof.leaf)
+                Ok(proof.leaf.0)
             })
             .collect::<Result<Vec<_>>>()?;
 

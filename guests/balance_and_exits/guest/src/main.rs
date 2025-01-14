@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use alloy_primitives::B256;
 use alloy_sol_types::SolValue;
 use bitvec::prelude::*;
 use bitvec::vec::BitVec;
@@ -22,7 +21,7 @@ use guest_io::balance_and_exits::Input;
 use guest_io::validator_membership::Journal as MembershipJounal;
 use membership_builder::VALIDATOR_MEMBERSHIP_ID;
 use risc0_zkvm::{guest::env, serde};
-use ssz_multiproofs::ValueIterator;
+use ssz_multiproofs::{Node, ValueIterator};
 use tracing_risc0::Risc0Formatter;
 use tracing_subscriber::fmt::format::FmtSpan;
 
@@ -73,22 +72,22 @@ pub fn main() {
     env::commit_slice(&num_exited_validators.abi_encode());
 }
 
-fn get_slot<'a, I: Iterator<Item = (u64, &'a B256)>>(values: &mut ValueIterator<'a, I>) -> u64 {
+fn get_slot<'a, I: Iterator<Item = (u64, &'a Node)>>(values: &mut ValueIterator<'a, I>) -> u64 {
     let slot = values
         .next_assert_gindex(beacon_block_gindices::slot())
         .unwrap();
     u64_from_b256(slot, 0)
 }
 
-fn get_state_root<'a, I: Iterator<Item = (u64, &'a B256)>>(
+fn get_state_root<'a, I: Iterator<Item = (u64, &'a Node)>>(
     values: &mut ValueIterator<'a, I>,
-) -> &'a B256 {
+) -> &'a Node {
     values
         .next_assert_gindex(beacon_block_gindices::state_root())
         .unwrap()
 }
 
-fn get_validator_count<'a, I: Iterator<Item = (u64, &'a B256)>>(
+fn get_validator_count<'a, I: Iterator<Item = (u64, &'a Node)>>(
     values: &mut ValueIterator<'a, I>,
 ) -> u64 {
     let validator_count = values
@@ -98,11 +97,11 @@ fn get_validator_count<'a, I: Iterator<Item = (u64, &'a B256)>>(
 }
 
 #[tracing::instrument(skip(membership))]
-fn verify_membership(state_root: &B256, membership: &BitVec<u32, Lsb0>, validator_count: u64) {
+fn verify_membership(state_root: &Node, membership: &BitVec<u32, Lsb0>, validator_count: u64) {
     let max_validator_index = validator_count - 1;
     let j = MembershipJounal {
         self_program_id: VALIDATOR_MEMBERSHIP_ID.into(),
-        state_root: state_root.clone(),
+        state_root: state_root.clone().into(),
         membership: membership.clone(),
         max_validator_index,
     };
@@ -111,7 +110,7 @@ fn verify_membership(state_root: &B256, membership: &BitVec<u32, Lsb0>, validato
 }
 
 #[tracing::instrument(skip(values, membership))]
-fn count_exited_validators<'a, I: Iterator<Item = (u64, &'a B256)>>(
+fn count_exited_validators<'a, I: Iterator<Item = (u64, &'a Node)>>(
     values: &mut ValueIterator<'a, I>,
     membership: &BitVec<u32, Lsb0>,
     slot: u64,
@@ -133,14 +132,14 @@ fn count_exited_validators<'a, I: Iterator<Item = (u64, &'a B256)>>(
 }
 
 #[tracing::instrument(skip(values, membership))]
-fn accumulate_balances<'a, I: Iterator<Item = (u64, &'a B256)>>(
+fn accumulate_balances<'a, I: Iterator<Item = (u64, &'a Node)>>(
     values: &mut ValueIterator<'a, I>,
     membership: &BitVec<u32, Lsb0>,
 ) -> u64 {
     // accumulate the balances but iterating over the membership bitvec
     // This is a little tricky as multiple balances are packed into a single gindex
     let mut cl_balance = 0;
-    let mut current_leaf = (0, &B256::default()); // 0 is an invalid gindex so this will always be updated on the first validator
+    let mut current_leaf = (0, &[0_u8; 32]); // 0 is an invalid gindex so this will always be updated on the first validator
     for validator_index in membership.iter_ones() {
         let expeted_gindex = beacon_state_gindices::validator_balance(validator_index as u64);
         if current_leaf.0 != expeted_gindex {
@@ -158,6 +157,6 @@ fn accumulate_balances<'a, I: Iterator<Item = (u64, &'a B256)>>(
 
 /// Slice an 8 byte u64 out of a 32 byte chunk
 /// pos gives the position (e.g. first 8 bytes, second 8 bytes, etc.)
-fn u64_from_b256(node: &B256, pos: usize) -> u64 {
+fn u64_from_b256(node: &[u8; 32], pos: usize) -> u64 {
     u64::from_le_bytes(node[pos * 8..(pos + 1) * 8].try_into().unwrap())
 }

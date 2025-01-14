@@ -13,5 +13,5 @@ pub use builder::MultiproofBuilder;
 pub use error::{Error, Result};
 pub use multiproof::{Multiproof, ValueIterator};
 
-pub(crate) type Node = alloy_primitives::B256;
+pub type Node = [u8; 32];
 pub(crate) type Descriptor = BitVec<u32, Lsb0>;

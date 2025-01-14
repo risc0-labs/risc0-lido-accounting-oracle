@@ -47,7 +47,11 @@ fn test_proving_validator_fields() {
         multiproof.values().next(),
         Some((
             gindex as u64,
-            &super::Node::from_slice(beacon_state.validators[0].withdrawal_credentials.as_slice())
+            beacon_state.validators[0]
+                .withdrawal_credentials
+                .as_slice()
+                .try_into()
+                .unwrap()
         ))
     );
 
@@ -72,7 +76,10 @@ fn test_proving_state_roots() {
 
     assert_eq!(
         multiproof.values().next(),
-        Some((gindex as u64, &beacon_state.state_roots[10]))
+        Some((
+            gindex as u64,
+            &beacon_state.state_roots[10].as_slice().try_into().unwrap()
+        ))
     );
 
     test_roundtrip_serialization(&multiproof);

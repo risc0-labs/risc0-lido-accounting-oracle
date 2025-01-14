@@ -13,7 +13,16 @@ use crate::{Descriptor, Node};
 /// Note this will iterate over the values/gindices in depth-first left-to-right order as they appear in the SSZ merkle tree.
 /// This will NOT be the order they were added or increasing order of gindex, it will depend on the shape of the data structure.
 ///
-#[derive(Debug, PartialEq, Default, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    PartialEq,
+    Default,
+    serde::Serialize,
+    serde::Deserialize,
+    // rkyv::Serialize,
+    // rkyv::Deserialize,
+    // rkyv::Archive,
+)]
 pub struct Multiproof {
     /// The merkle tree nodes corresponding to both leaves and internal proof nodes
     pub(crate) nodes: Vec<Node>,
@@ -201,9 +210,7 @@ fn calculate_compact_multi_merkle_root(
                 }
 
                 stack.pop(); // pop the internal node and replace with the hashed children
-                stack.push(TreeNode::Computed(Node::from_slice(
-                    &hasher.finalize_reset(),
-                )));
+                stack.push(TreeNode::Computed(hasher.finalize_reset().into()));
             }
         } else {
             stack.push(TreeNode::Internal);
