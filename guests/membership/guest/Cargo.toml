@@ -9,6 +9,7 @@ guest-io = { path = "../../../crates/guest-io", default-features = false }
 gindices = { path = "../../../crates/gindices" }
 ssz-multiproofs = { path = "../../../crates/ssz-multiproofs" }
 tracing-risc0 = { path = "../../../crates/tracing-risc0" }
+rkyv = "0.8.9"
 
 bitvec = { version = "1", features = ["serde"] }
 serde = "1.0.215"

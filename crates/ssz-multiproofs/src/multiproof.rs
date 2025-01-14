@@ -40,6 +40,48 @@ pub struct Multiproof {
     pub(crate) max_stack_depth: usize,
 }
 
+impl ArchivedMultiproof {
+    /// Verify this multi-proof against a given root
+    #[tracing::instrument(skip(self))]
+    pub fn verify(&self, root: &Node) -> Result<()> {
+        if self.calculate_root()? == *root {
+            Ok(())
+        } else {
+            Err(Error::RootMismatch)
+        }
+    }
+
+    /// Calculate the root of this multi-proof
+    pub fn calculate_root(&self) -> Result<Node> {
+        calculate_compact_multi_merkle_root(&self.nodes, &self.descriptor, self.max_stack_depth)
+    }
+
+    /// Creates an iterator the nodes in this proof along with their gindices
+    pub fn nodes(&self) -> impl Iterator<Item = (u64, &Node)> {
+        GIndexIterator::new(&self.descriptor).zip(self.nodes.iter())
+    }
+
+    /// Creates an iterator the values in this proof along with their gindices
+    pub fn values(&self) -> ValueIterator<impl Iterator<Item = (u64, &Node)>> {
+        ValueIterator::new(
+            self.nodes()
+                .zip(self.value_mask.iter())
+                .filter_map(|(node, is_value)| if *is_value { Some(node) } else { None }),
+        )
+    }
+
+    /// Finds the node corresponding to a given gindex.
+    /// Returns None if the gindex is not in the proof.
+    ///
+    /// Note this is a linear search, so it's not efficient for large proofs.
+    /// If there are a lot of values and you want to use them all it is much more efficient to use the iterator instead
+    pub fn get(&self, gindex: u64) -> Option<&Node> {
+        self.values()
+            .find(|(g, _)| *g == gindex)
+            .map(|(_, node)| node)
+    }
+}
+
 impl Multiproof {
     /// Verify this multi-proof against a given root
     #[tracing::instrument(skip(self))]

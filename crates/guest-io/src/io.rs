@@ -147,6 +147,16 @@ pub mod validator_membership {
                 multiproof,
             })
         }
+
+        /// Serializes the AssessorInput to a Vec<u8> using postcard.
+        pub fn to_vec(&self) -> Vec<u8> {
+            let bytes = rkyv::to_bytes::<rkyv::rancor::Error>(self).unwrap();
+            let length = bytes.len() as u32;
+            let mut result = Vec::with_capacity(4 + bytes.len());
+            result.extend_from_slice(&length.to_le_bytes());
+            result.extend_from_slice(&bytes);
+            result
+        }
     }
 
     #[derive(
@@ -210,12 +220,21 @@ pub mod validator_membership {
 pub mod balance_and_exits {
     use super::*;
 
-    #[derive(Debug, serde::Serialize, serde::Deserialize)]
+    #[derive(
+        Debug,
+        serde::Serialize,
+        serde::Deserialize,
+        rkyv::Archive,
+        rkyv::Serialize,
+        rkyv::Deserialize,
+    )]
     pub struct Input {
         /// Block that the proof is rooted in
+        #[rkyv(with = FixedBytesWrapper)]
         pub block_root: B256,
 
         /// Bitfield indicating which validators are members of the Lido set
+        #[rkyv(with = BitVecWrapper)]
         pub membership: BitVec<u32, Lsb0>,
 
         /// Merkle SSZ proof rooted in the beacon block
@@ -268,6 +287,16 @@ pub mod balance_and_exits {
                 block_multiproof,
                 state_multiproof,
             })
+        }
+
+        /// Serializes the AssessorInput to a Vec<u8> using postcard.
+        pub fn to_vec(&self) -> Vec<u8> {
+            let bytes = rkyv::to_bytes::<rkyv::rancor::Error>(self).unwrap();
+            let length = bytes.len() as u32;
+            let mut result = Vec::with_capacity(4 + bytes.len());
+            result.extend_from_slice(&length.to_le_bytes());
+            result.extend_from_slice(&bytes);
+            result
         }
     }
 }
