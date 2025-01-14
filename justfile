@@ -1,10 +1,36 @@
 set dotenv-load := true
 
-initialize_membership slot:
-    cargo run --release -- --slot {{slot}} membership --max-validator-index 100 --out ./membership_proof_{{slot}}.bin initialize
+build:
+    cargo build --release
 
-update_membership prior_slot slot:
-    cargo run --release -- --slot {{slot}} membership --max-validator-index 101 --out ./membership_proof_{{slot}}.bin update ./membership_proof_{{prior_slot}}.bin
 
-aggregate slot:
-    cargo run --release -- --slot {{slot}} aggregate --out ./aggproof_{{slot}}.bin ./proof1.bin
+## Input building tasks
+
+build_input_initialization slot: build
+    ./target/release/cli --slot {{slot}} build --out ./input_membership_initialization_{{slot}}.bin initial
+
+build_input_continuation prior_slot slot: build
+    ./target/release/cli --slot {{slot}} build --out ./input_membership_continuation_{{prior_slot}}_to_{{slot}}.bin continuation-from {{prior_slot}} 
+
+build_input_aggregation slot: build
+    ./target/release/cli --slot {{slot}} build --out ./input_aggregation_{{slot}}.bin aggregation
+
+
+## Proving tasks
+
+prove_membership_init slot: build
+    ./target/release/cli --slot {{slot}} prove --input ./input_membership_initialization_{{slot}}.bin --out ./membership_proof_{{slot}}.bin initial
+
+prove_membership_continuation prior_slot slot: build
+    ./target/release/cli --slot {{slot}} prove --input ./input_membership_continuation_{{prior_slot}}_to_{{slot}}.bin --out ./membership_proof_{{slot}}.bin continuation-from ./membership_proof_{{prior_slot}}.bin
+
+prove_aggregate slot: build
+    ./target/release/cli --slot {{slot}} prove --input ./input_aggregation_{{slot}}.bin --out ./aggregate_proof_{{slot}}.bin aggregation ./membership_proof_{{slot}}.bin
+
+
+
+## Submission to chain
+
+submit slot: build
+    ./target/release/cli --slot {{slot}} submit --proof ./aggregate_proof_{{slot}}.bin
+

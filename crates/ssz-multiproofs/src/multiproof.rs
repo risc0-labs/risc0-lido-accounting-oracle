@@ -19,7 +19,7 @@ pub struct Multiproof {
     pub(crate) nodes: Vec<Node>,
 
     /// mask indicating which nodes are values (1) or proof supporting nodes (0)
-    pub(crate) value_mask: BitVec<u32, Msb0>,
+    pub(crate) value_mask: BitVec<u32, Lsb0>,
 
     /// bitvector describing the shape of the proof. See https://github.com/ethereum/consensus-specs/pull/3148
     pub(crate) descriptor: Descriptor,
@@ -251,7 +251,7 @@ mod tests {
     fn test_gindex_iterator() {
         use super::*;
 
-        let descriptor = bitvec![u8, Msb0; 0,0,1,0,0,1,0,1,1,1,1];
+        let descriptor = bitvec![u32, Lsb0; 0,0,1,0,0,1,0,1,1,1,1];
         assert_eq!(
             GIndexIterator::new(&descriptor).collect::<Vec<u64>>(),
             vec![4, 20, 42, 43, 11, 3]

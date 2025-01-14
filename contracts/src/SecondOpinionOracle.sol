@@ -20,16 +20,10 @@ import {IRiscZeroVerifier} from "risc0/IRiscZeroVerifier.sol";
 import {ISecondOpinionOracle} from "./ISecondOpinionOracle.sol";
 import {BlockRoots} from "./BlockRoots.sol";
 import {ImageID} from "./ImageID.sol"; // auto-generated contract after running `cargo build`.
+import {Report, IOracleProofReceiver} from "./IOracleProofReceiver.sol";
 
 /// @title LIP-23 Compatible Oracle implemented using RISC Zero
-contract SecondOpinionOracle is ISecondOpinionOracle {
-    struct Report {
-        uint256 clBalanceGwei;
-        uint256 withdrawalVaultBalanceWei;
-        uint256 totalDepositedValidators;
-        uint256 totalExitedValidators;
-    }
-
+contract SecondOpinionOracle is ISecondOpinionOracle, IOracleProofReceiver {
     /// @notice RISC Zero verifier contract address.
     IRiscZeroVerifier public immutable verifier;
 
@@ -45,7 +39,7 @@ contract SecondOpinionOracle is ISecondOpinionOracle {
     }
 
     /// @notice Set an oracle report for a given slot by verifying the ZK proof
-    function update(uint256 refSlot, Report calldata r, bytes calldata seal) public {
+    function update(uint256 refSlot, Report calldata r, bytes calldata seal) external {
         bytes32 blockRoot = BlockRoots.findBlockRoot(refSlot);
 
         bytes memory journal = abi.encodePacked(

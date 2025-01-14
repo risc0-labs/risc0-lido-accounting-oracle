@@ -14,39 +14,44 @@
 
 mod beacon_client;
 
+use alloy::{
+    dyn_abi::SolType, network::EthereumWallet, primitives::Address, providers::ProviderBuilder,
+    signers::local::PrivateKeySigner,
+};
 use anyhow::Result;
 use balance_and_exits_builder::BALANCE_AND_EXITS_ELF;
 use beacon_client::BeaconClient;
 use clap::Parser;
 use ethereum_consensus::phase0::mainnet::{HistoricalBatch, SLOTS_PER_HISTORICAL_ROOT};
 use membership_builder::{VALIDATOR_MEMBERSHIP_ELF, VALIDATOR_MEMBERSHIP_ID};
-use risc0_zkvm::{
-    default_prover,
-    serde::{from_slice, to_vec},
-    ExecutorEnv, Receipt,
-};
+use risc0_ethereum_contracts::encode_seal;
+use risc0_zkvm::{default_prover, ExecutorEnv, Receipt};
 use std::{
-    fs::{read, File},
-    io::Write,
+    fs::{read, write},
     path::PathBuf,
 };
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 use url::Url;
 
+alloy::sol!(
+    #[sol(rpc, all_derives)]
+    "../contracts/src/IOracleProofReceiver.sol"
+);
+
 /// CLI for generating and submitting Lido oracle proofs
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-    /// Ethereum beacon node HTTP RPC endpoint.
-    #[clap(long, env)]
-    beacon_rpc_url: Url,
-
     /// slot at which to base the proofs
     #[clap(long)]
     slot: u64,
 
+    /// The top validator index proofs  will be extended to.
+    /// If not included it will proceed up to the total number of validators
+    /// in the beacon state at the given slot.
+    /// This does nothing for aggregation proofs which must be run for all validators.
     #[clap(long)]
-    input_data: Option<PathBuf>,
+    max_validator_index: Option<u64>,
 
     #[clap(subcommand)]
     command: Command,
@@ -55,36 +60,70 @@ struct Args {
 /// Subcommands of the publisher CLI.
 #[derive(Parser, Debug)]
 enum Command {
-    /// Generate or update a membership proof
-    Membership {
-        /// The top validator index the membership proof will be extended to.
-        /// If not included it will proceed up to the total number of validators
-        /// in the beacon state at the given slot
-        #[clap(long)]
-        max_validator_index: Option<u64>,
+    /// Build an input for a proof
+    #[clap(name = "build")]
+    BuildInput {
+        /// Ethereum beacon node HTTP RPC endpoint.
+        #[clap(long, env)]
+        beacon_rpc_url: Url,
 
         #[clap(long = "out", short)]
         out_path: PathBuf,
 
         #[clap(subcommand)]
-        command: MembershipCommand,
+        command: BuildCommand,
     },
-    /// Produce the final oracle proof to go on-chain
-    Aggregate {
+    /// Generate a proof from a given input
+    Prove {
+        #[clap(long = "input", short)]
+        input_path: PathBuf,
+
         #[clap(long = "out", short)]
         out_path: PathBuf,
 
-        membership_proof_path: PathBuf,
+        #[clap(subcommand)]
+        command: ProveCommand,
+    },
+    /// Submit an aggregation proof to the oracle contract
+    Submit {
+        /// Eth key to sign with
+        #[clap(long, env)]
+        eth_wallet_private_key: PrivateKeySigner,
+
+        /// Ethereum Node endpoint.
+        #[clap(long, env)]
+        eth_rpc_url: Url,
+
+        /// SecondOpinionOracle contract address
+        #[clap(long, env)]
+        contract: Address,
+
+        #[clap(long = "proof", short)]
+        proof_path: PathBuf,
     },
 }
 
-/// Membership specific subcommands of the publisher CLI.
 #[derive(Parser, Debug)]
-enum MembershipCommand {
-    /// Generate a new membership proof from scratch
-    Initialize,
-    /// Update an existing membership proof
-    Update { in_path: PathBuf },
+enum BuildCommand {
+    /// An initial membership proof
+    Initial,
+    /// A continuation from a prior membership proof
+    ContinuationFrom {
+        prior_slot: u64,
+        prior_max_validator_index: Option<u64>,
+    },
+    /// An aggregation (oracle) proof that can be submitted on-chain
+    Aggregation,
+}
+
+#[derive(Parser, Debug)]
+enum ProveCommand {
+    /// An initial membership proof
+    Initial,
+    /// A continuation from a prior membership proof
+    ContinuationFrom { prior_path: PathBuf },
+    /// An aggregation (oracle) proof that can be submitted on-chain
+    Aggregation { membership_proof_path: PathBuf },
 }
 
 #[tokio::main]
@@ -97,46 +136,92 @@ async fn main() -> Result<()> {
     let args = Args::parse();
 
     match args.command {
-        Command::Membership {
-            max_validator_index,
+        Command::BuildInput {
             out_path,
-            command: MembershipCommand::Initialize,
+            command: BuildCommand::Initial,
+            beacon_rpc_url,
         } => {
-            build_membership_proof(
-                args.beacon_rpc_url,
+            let input = build_membership_input(
+                beacon_rpc_url,
                 args.slot,
-                max_validator_index,
+                args.max_validator_index,
                 None,
-                out_path,
+                None,
             )
-            .await?
+            .await?;
+            write(out_path, &bincode::serialize(&input)?)?;
         }
-        Command::Membership {
-            max_validator_index,
+        Command::BuildInput {
             out_path,
-            command: MembershipCommand::Update { in_path },
+            beacon_rpc_url,
+            command:
+                BuildCommand::ContinuationFrom {
+                    prior_slot,
+                    prior_max_validator_index,
+                },
         } => {
-            build_membership_proof(
-                args.beacon_rpc_url,
+            let input = build_membership_input(
+                beacon_rpc_url,
                 args.slot,
-                max_validator_index,
-                Some(in_path),
-                out_path,
+                args.max_validator_index,
+                Some(prior_slot),
+                prior_max_validator_index,
             )
-            .await?
+            .await?;
+            write(out_path, &bincode::serialize(&input)?)?;
         }
-        Command::Aggregate {
+        Command::BuildInput {
             out_path,
-            membership_proof_path,
+            beacon_rpc_url,
+            command: BuildCommand::Aggregation { .. },
         } => {
-            build_aggregate_proof(
-                args.beacon_rpc_url,
-                args.slot,
-                membership_proof_path,
-                args.input_data,
-                out_path,
-            )
-            .await?
+            let input = build_aggregate_input(beacon_rpc_url, args.slot).await?;
+            write(out_path, &bincode::serialize(&input)?)?;
+        }
+        Command::Prove {
+            out_path,
+            command: ProveCommand::Initial,
+            input_path,
+        } => {
+            let input = bincode::deserialize(&read(input_path)?)?;
+            let proof =
+                build_membership_proof(input, None, args.slot, args.max_validator_index).await?;
+            write(out_path, &bincode::serialize(&proof)?)?;
+        }
+        Command::Prove {
+            out_path,
+            command: ProveCommand::ContinuationFrom { prior_path },
+            input_path,
+        } => {
+            let input = bincode::deserialize(&read(input_path)?)?;
+            let prior_proof = Some(bincode::deserialize(&read(prior_path)?)?);
+            let proof =
+                build_membership_proof(input, prior_proof, args.slot, args.max_validator_index)
+                    .await?;
+            write(out_path, &bincode::serialize(&proof)?)?;
+        }
+        Command::Prove {
+            out_path,
+            command:
+                ProveCommand::Aggregation {
+                    membership_proof_path,
+                },
+            input_path,
+        } => {
+            let input = bincode::deserialize(&read(input_path)?)?;
+            let membership_proof: MembershipProof =
+                bincode::deserialize(&read(membership_proof_path)?)?;
+            let proof = build_aggregate_proof(input, membership_proof, args.slot).await?;
+            write(out_path, &bincode::serialize(&proof)?)?;
+        }
+        Command::Submit {
+            eth_wallet_private_key,
+            eth_rpc_url,
+            contract,
+            proof_path,
+        } => {
+            submit_aggregate_proof(eth_wallet_private_key, eth_rpc_url, contract, proof_path)
+                .await?
         }
     }
 
@@ -161,14 +246,14 @@ impl MembershipProof {
 }
 
 #[tracing::instrument(skip(beacon_rpc_url))]
-async fn build_membership_proof(
+async fn build_membership_input(
     beacon_rpc_url: Url,
     slot: u64,
     max_validator_index: Option<u64>,
-    in_path: Option<PathBuf>,
-    out_path: PathBuf,
-) -> Result<()> {
-    use guest_io::validator_membership::{Input, Journal};
+    prior_slot: Option<u64>,
+    prior_max_validator_index: Option<u64>,
+) -> Result<guest_io::validator_membership::Input> {
+    use guest_io::validator_membership::Input;
 
     let beacon_client = BeaconClient::new_with_cache(beacon_rpc_url, "./beacon-cache")?;
     let beacon_state = beacon_client.get_beacon_state(slot).await?;
@@ -178,104 +263,130 @@ async fn build_membership_proof(
     let max_validator_index =
         max_validator_index.unwrap_or((beacon_state.validators().len() - 1) as u64);
 
-    let mut env_builder = ExecutorEnv::builder();
+    let input = if let (Some(prior_slot), Some(prior_max_validator_index)) =
+        (prior_slot, prior_max_validator_index)
+    {
+        let hist_summary = if beacon_state.slot() > prior_slot + (SLOTS_PER_HISTORICAL_ROOT as u64)
+        {
+            // this is a long range continuation and we need to provide an intermediate historical summary
+            tracing::info!("Long range continuation detected");
+            let inter_slot = (prior_slot / (SLOTS_PER_HISTORICAL_ROOT as u64) + 1)
+                * (SLOTS_PER_HISTORICAL_ROOT as u64);
+            tracing::info!("Fetching intermediate state at slot: {}", inter_slot);
+            let inter_state = beacon_client.get_beacon_state(inter_slot).await?;
+            Some(HistoricalBatch {
+                block_roots: inter_state.block_roots().clone(),
+                state_roots: inter_state.state_roots().clone(),
+            })
+        } else {
+            None
+        };
 
-    let env = if let Some(in_path) = in_path {
-        tracing::info!("Reading prior proof from file: {:?}", in_path);
-        let prior_proof: MembershipProof = bincode::deserialize(&read(in_path)?)?;
-
-        let hist_summary =
-            if beacon_state.slot() > prior_proof.slot + (SLOTS_PER_HISTORICAL_ROOT as u64) {
-                // this is a long range continuation and we need to provide an intermediate historical summary
-                tracing::info!("Long range continuation detected");
-                let inter_slot = (prior_proof.slot / (SLOTS_PER_HISTORICAL_ROOT as u64) + 1)
-                    * (SLOTS_PER_HISTORICAL_ROOT as u64);
-                tracing::info!("Fetching intermediate state at slot: {}", inter_slot);
-                let inter_state = beacon_client.get_beacon_state(inter_slot).await?;
-                Some(HistoricalBatch {
-                    block_roots: inter_state.block_roots().clone(),
-                    state_roots: inter_state.state_roots().clone(),
-                })
-            } else {
-                None
-            };
-
-        let prior_beacon_state = beacon_client.get_beacon_state(prior_proof.slot).await?;
-        let input = Input::build_continuation(
+        let prior_beacon_state = beacon_client.get_beacon_state(prior_slot).await?;
+        Input::build_continuation(
             &prior_beacon_state,
-            prior_proof.max_validator_index,
+            prior_max_validator_index,
             &beacon_state,
             max_validator_index,
             &hist_summary,
             VALIDATOR_MEMBERSHIP_ID,
-        )?;
+        )?
+    } else {
+        Input::build_initial(&beacon_state, max_validator_index, VALIDATOR_MEMBERSHIP_ID)?
+    };
+    Ok(input)
+}
+
+#[tracing::instrument(skip(input, prior_proof))]
+async fn build_membership_proof(
+    input: guest_io::validator_membership::Input,
+    prior_proof: Option<MembershipProof>,
+    slot: u64,
+    max_validator_index: Option<u64>,
+) -> Result<MembershipProof> {
+    let mut env_builder = ExecutorEnv::builder();
+
+    let env = if let Some(prior_proof) = prior_proof {
         env_builder
             .add_assumption(prior_proof.receipt)
             .write(&input)?
             .build()?
     } else {
-        let input =
-            Input::build_initial(&beacon_state, max_validator_index, VALIDATOR_MEMBERSHIP_ID)?;
         env_builder.write(&input)?.build()?
     };
 
     let session_info = default_prover().prove(env, VALIDATOR_MEMBERSHIP_ELF)?;
-    tracing::debug!(
-        "program execution returned: {:?}",
-        session_info.receipt.journal.decode::<Journal>()?
-    );
     tracing::info!("total cycles: {}", session_info.stats.total_cycles);
 
-    let proof = MembershipProof::new(slot, max_validator_index, session_info.receipt);
-    let serialized_proof = bincode::serialize(&proof)?;
+    let proof = MembershipProof::new(slot, input.max_validator_index, session_info.receipt);
 
-    std::fs::write(out_path, &serialized_proof)?;
+    Ok(proof)
+}
 
-    Ok(())
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct AggregateProof {
+    slot: u64,
+    receipt: Receipt,
 }
 
 #[tracing::instrument(skip(beacon_rpc_url))]
-async fn build_aggregate_proof(
+async fn build_aggregate_input(
     beacon_rpc_url: Url,
     slot: u64,
-    membership_proof_path: PathBuf,
-    input_path: Option<PathBuf>,
-    out_path: PathBuf,
-) -> Result<()> {
-    use guest_io::balance_and_exits::Input;
+) -> Result<guest_io::balance_and_exits::Input> {
+    let beacon_client = BeaconClient::new_with_cache(beacon_rpc_url, "./beacon-cache")?;
+    let beacon_block_header = beacon_client.get_block_header(slot).await?;
 
-    let input = if let Some(input_data) = input_path {
-        tracing::info!("Reading input data from file: {:?}", input_data);
-        let input_data = std::fs::read(input_data)?;
-        let input: Input = from_slice(&input_data)?;
-        input
-    } else {
-        let beacon_client = BeaconClient::new_with_cache(beacon_rpc_url, "./beacon-cache")?;
-        let beacon_block_header = beacon_client.get_block_header(slot).await?;
+    let beacon_state = beacon_client.get_beacon_state(slot).await?;
+    let input =
+        guest_io::balance_and_exits::Input::build(&beacon_block_header.message, &beacon_state)?;
 
-        let beacon_state = beacon_client.get_beacon_state(slot).await?;
-        let input = Input::build(&beacon_block_header.message, &beacon_state)?;
+    Ok(input)
+}
 
-        // serialize input and write it to file
-        let serialized_input = to_vec(&input)?;
-        let mut file = File::create(format!("input_data_slot_{}.bin", slot))?;
-        file.write_all(&bytemuck::cast_slice(&serialized_input))?;
-        input
-    };
-
-    let membership_proof: MembershipProof = bincode::deserialize(&read(membership_proof_path)?)?;
-
+#[tracing::instrument(skip(input, membership_proof))]
+async fn build_aggregate_proof(
+    input: guest_io::balance_and_exits::Input,
+    membership_proof: MembershipProof,
+    slot: u64,
+) -> Result<AggregateProof> {
     let env = ExecutorEnv::builder()
         .add_assumption(membership_proof.receipt)
         .write(&input)?
         .build()?;
 
     let session_info = default_prover().prove(env, BALANCE_AND_EXITS_ELF)?;
-    tracing::debug!(
-        "program execution returned: {:?}",
-        session_info.receipt.journal
-    );
     tracing::info!("total cycles: {}", session_info.stats.total_cycles);
 
+    Ok(AggregateProof {
+        slot,
+        receipt: session_info.receipt,
+    })
+}
+
+async fn submit_aggregate_proof(
+    eth_wallet_private_key: PrivateKeySigner,
+    eth_rpc_url: Url,
+    contract: Address,
+    in_path: PathBuf,
+) -> Result<()> {
+    let wallet = EthereumWallet::from(eth_wallet_private_key);
+    let provider = ProviderBuilder::new()
+        .with_recommended_fillers()
+        .wallet(wallet)
+        .on_http(eth_rpc_url);
+
+    let proof: AggregateProof = bincode::deserialize(&read(in_path)?)?;
+    let seal = encode_seal(&proof.receipt)?;
+
+    let contract = IOracleProofReceiver::new(contract, provider);
+    // skip the first 32 bytes of the journal as that is the beacon block hash which is not part of the report
+    let report = Report::abi_decode_params(&proof.receipt.journal.bytes[32..], true)?;
+    let call_builder = contract.update(proof.slot.try_into()?, report, seal.into());
+
+    let pending_tx = call_builder.send().await?;
+    tracing::info!("Submitted proof with tx hash: {}", pending_tx.tx_hash());
+    let tx_receipt = pending_tx.get_receipt().await?;
+    tracing::info!("Tx included with receipt {:?}", tx_receipt);
     Ok(())
 }

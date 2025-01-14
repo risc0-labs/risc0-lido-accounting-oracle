@@ -185,7 +185,7 @@ pub mod validator_membership {
 pub mod balance_and_exits {
     use super::*;
 
-    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, serde::Serialize, serde::Deserialize)]
     pub struct Input {
         /// Block that the proof is rooted in
         pub block_root: B256,

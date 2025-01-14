@@ -17,49 +17,39 @@ include!(concat!(env!("OUT_DIR"), "/methods.rs"));
 
 #[cfg(test)]
 mod tests {
-    use ethereum_consensus::deneb::Validator;
-    use ethereum_consensus::phase0::presets::mainnet::{BeaconBlockHeader, BeaconState};
+    use ethereum_consensus::phase0::presets::mainnet::BeaconBlockHeader;
     use ethereum_consensus::ssz::prelude::*;
-    use guest_io::WITHDRAWAL_CREDENTIALS;
+    use gindices::presets::mainnet::beacon_state::CAPELLA_FORK_SLOT;
     use guest_io::{balance_and_exits, validator_membership};
     use risc0_zkvm::{default_executor, default_prover, ExecutorEnv};
+    use test_utils::TestStateBuilder;
 
     #[test]
     fn test_balance_and_exits() -> anyhow::Result<()> {
-        let n_empty_validators = 100;
-        let n_lido_validators = 10;
+        let n_validators = 10;
+        let n_lido_validators = 1;
+        let max_validator_index = n_validators + n_lido_validators - 1;
+
+        let mut b = TestStateBuilder::new(CAPELLA_FORK_SLOT);
+        b.with_validators(n_validators);
+        b.with_lido_validators(n_lido_validators);
+        let s = b.build();
 
         let mut block_header = BeaconBlockHeader::default();
-        let mut beacon_state = BeaconState::default();
-
-        for _ in 0..n_empty_validators {
-            beacon_state.validators.push(Default::default());
-            beacon_state.balances.push(99);
-        }
-        for _ in 0..n_lido_validators {
-            beacon_state.validators.push(Validator {
-                withdrawal_credentials: WITHDRAWAL_CREDENTIALS.as_slice().try_into().unwrap(),
-                ..Default::default()
-            });
-            beacon_state.balances.push(10);
-        }
-        block_header.state_root = beacon_state.hash_tree_root()?.into();
+        block_header.slot = s.slot();
+        block_header.state_root = s.hash_tree_root().unwrap();
 
         // build a membership proof
         let input = validator_membership::Input::build_initial(
-            &ethereum_consensus::types::mainnet::BeaconState::Phase0(beacon_state.clone()),
-            (beacon_state.validators.len() - 1) as u64,
+            &s.clone(),
+            max_validator_index as u64,
             membership_builder::VALIDATOR_MEMBERSHIP_ID,
         )?;
         let env = ExecutorEnv::builder().write(&input)?.build()?;
         let membership_proof =
             default_prover().prove(env, membership_builder::VALIDATOR_MEMBERSHIP_ELF)?;
 
-        let input = balance_and_exits::Input::build(
-            &block_header,
-            &ethereum_consensus::types::mainnet::BeaconState::Phase0(beacon_state.clone()),
-        )
-        .unwrap();
+        let input = balance_and_exits::Input::build(&block_header, &s.clone()).unwrap();
 
         let env = ExecutorEnv::builder()
             .add_assumption(membership_proof.receipt)

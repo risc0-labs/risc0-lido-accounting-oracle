@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["cli", "guests/membership", "guests/balance_and_exits", "crates/ssz-multiproofs", "crates/gindices", "crates/guest-io", "crates/tracing-risc0"]
+members = ["cli", "guests/membership", "guests/balance_and_exits", "crates/ssz-multiproofs", "crates/gindices", "crates/guest-io", "crates/tracing-risc0", "crates/test-utils"]
 
 [workspace.package]
 version = "0.1.0"
@@ -12,6 +12,7 @@ ssz-multiproofs.path = "./crates/ssz-multiproofs"
 guest-io.path = "./crates/guest-io"
 membership_builder.path = "./guests/membership"
 balance_and_exits_builder.path = "./guests/balance_and_exits"
+test-utils.path = "./crates/test-utils"
 
 alloy = { version = "0.6", features = ["full"] }
 alloy-primitives = { version = "0.7", default-features = false, features = ["rlp", "serde", "std"] }

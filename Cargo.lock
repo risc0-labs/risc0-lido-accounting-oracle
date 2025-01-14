@@ -1117,6 +1117,7 @@ dependencies = [
  "anyhow",
  "bitvec",
  "ethereum-consensus",
+ "gindices",
  "guest-io",
  "hex",
  "membership_builder",
@@ -1124,6 +1125,7 @@ dependencies = [
  "risc0-build-ethereum",
  "risc0-zkp",
  "risc0-zkvm",
+ "test-utils",
 ]
 
 [[package]]
@@ -3136,6 +3138,7 @@ dependencies = [
  "risc0-build-ethereum",
  "risc0-zkp",
  "risc0-zkvm",
+ "test-utils",
 ]
 
 [[package]]
@@ -5059,6 +5062,19 @@ dependencies = [
  "once_cell",
  "rustix",
  "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "test-utils"
+version = "0.1.0"
+dependencies = [
+ "alloy-primitives 0.7.7",
+ "alloy-sol-types 0.7.7",
+ "anyhow",
+ "bitvec",
+ "ethereum-consensus",
+ "gindices",
+ "guest-io",
 ]
 
 [[package]]
