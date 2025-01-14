@@ -95,7 +95,7 @@ pub fn main() {
 
         // Verify the prior membership proof
         let prior_proof_journal = Journal {
-            self_program_id,
+            self_program_id: self_program_id.into(),
             state_root: prior_state_root,
             max_validator_index: prior_max_validator_index,
             membership: prior_membership.clone(),
@@ -114,7 +114,7 @@ pub fn main() {
     }
 
     let journal = Journal {
-        self_program_id,
+        self_program_id: self_program_id.into(),
         state_root,
         max_validator_index,
         membership,

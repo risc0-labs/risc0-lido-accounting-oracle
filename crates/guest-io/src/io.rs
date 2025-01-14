@@ -1,6 +1,7 @@
 use alloy_primitives::B256;
 use bitvec::prelude::*;
 use risc0_zkvm::sha::Digest;
+use rkyv_wrappers::{BitVecWrapper, FixedBytesWrapper};
 use ssz_multiproofs::Multiproof;
 #[cfg(feature = "builder")]
 use {
@@ -19,13 +20,21 @@ pub mod validator_membership {
 
     use super::*;
 
-    #[derive(Debug, serde::Serialize, serde::Deserialize)]
+    #[derive(
+        Debug,
+        serde::Serialize,
+        serde::Deserialize,
+        rkyv::Archive,
+        rkyv::Serialize,
+        rkyv::Deserialize,
+    )]
     pub struct Input {
         /// The Program ID of this program. Need to accept it as input rather than hard-code otherwise it creates a cyclic hash reference
         /// This MUST be written to the journal and checked by the verifier! See https://github.com/risc0/risc0-ethereum/blob/main/contracts/src/RiscZeroSetVerifier.sol#L114
-        pub self_program_id: Digest,
+        pub self_program_id: [u32; 8],
 
         /// The state root of the state used in the current proof
+        #[rkyv(with = FixedBytesWrapper)]
         pub state_root: B256,
 
         /// the top validator index the membership proof will be extended to
@@ -56,7 +65,7 @@ pub mod validator_membership {
                 }));
 
             let multiproof = build_with_versioned_state(proof_builder, beacon_state)?;
-
+            let self_program_id = self_program_id.into();
             Ok(Self {
                 self_program_id: self_program_id.into(),
                 state_root,
@@ -123,7 +132,7 @@ pub mod validator_membership {
             };
 
             let multiproof = build_with_versioned_state(proof_builder, beacon_state)?;
-
+            let self_program_id = self_program_id.into();
             Ok(Self {
                 self_program_id: self_program_id.into(),
                 state_root,
@@ -140,13 +149,22 @@ pub mod validator_membership {
         }
     }
 
-    #[derive(Debug, serde::Serialize, serde::Deserialize)]
+    #[derive(
+        Debug,
+        serde::Serialize,
+        serde::Deserialize,
+        rkyv::Archive,
+        rkyv::Serialize,
+        rkyv::Deserialize,
+    )]
     pub enum ProofType {
         Initial,
         Continuation {
+            #[rkyv(with = FixedBytesWrapper)]
             prior_state_root: B256,
             prior_slot: u64,
             prior_max_validator_index: u64,
+            #[rkyv(with = BitVecWrapper)]
             prior_membership: BitVec<u32, Lsb0>,
             cont_type: ContinuationType,
         },
@@ -166,7 +184,14 @@ pub mod validator_membership {
     ///    This also requires fetching the state at slot ( (prior_slot / SLOTS_PER_HISTORICAL_ROOT + 1) * SLOTS_PER_HISTORICAL_ROOT )
     ///    to retrieve its state_roots list and build a merkle proof into it
     ///
-    #[derive(Debug, serde::Serialize, serde::Deserialize)]
+    #[derive(
+        Debug,
+        serde::Serialize,
+        serde::Deserialize,
+        rkyv::Archive,
+        rkyv::Serialize,
+        rkyv::Deserialize,
+    )]
     pub enum ContinuationType {
         SameSlot,
         ShortRange,

@@ -3,6 +3,7 @@ use sha2::{Digest, Sha256};
 
 use crate::error::{Error, Result};
 use crate::{Descriptor, Node};
+use rkyv_wrappers::BitVecWrapper;
 
 /// An abstraction around a SSZ merkle multi-proof
 ///
@@ -19,18 +20,20 @@ use crate::{Descriptor, Node};
     Default,
     serde::Serialize,
     serde::Deserialize,
-    // rkyv::Serialize,
-    // rkyv::Deserialize,
-    // rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    rkyv::Archive,
 )]
 pub struct Multiproof {
     /// The merkle tree nodes corresponding to both leaves and internal proof nodes
     pub(crate) nodes: Vec<Node>,
 
     /// mask indicating which nodes are values (1) or proof supporting nodes (0)
+    #[rkyv(with = BitVecWrapper)]
     pub(crate) value_mask: BitVec<u32, Lsb0>,
 
     /// bitvector describing the shape of the proof. See https://github.com/ethereum/consensus-specs/pull/3148
+    #[rkyv(with = BitVecWrapper)]
     pub(crate) descriptor: Descriptor,
 
     /// hint for the depth of the stack needed to verify this proof, useful for preallocation and computing this can be done outside the ZKVM

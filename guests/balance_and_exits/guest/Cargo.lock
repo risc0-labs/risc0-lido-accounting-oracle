@@ -981,6 +981,8 @@ dependencies = [
  "alloy-primitives",
  "bitvec",
  "risc0-zkvm",
+ "rkyv",
+ "rkyv-wrappers",
  "serde",
  "ssz-multiproofs",
  "thiserror 2.0.9",
@@ -1731,6 +1733,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rkyv-wrappers"
+version = "0.1.0"
+dependencies = [
+ "alloy-primitives",
+ "bitvec",
+ "rkyv",
+]
+
+[[package]]
 name = "rkyv_derive"
 version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2006,6 +2017,7 @@ dependencies = [
  "bitvec",
  "risc0-zkvm",
  "rkyv",
+ "rkyv-wrappers",
  "serde",
  "sha2",
  "thiserror 2.0.9",
