@@ -26,6 +26,7 @@ import {Report, IOracleProofReceiver} from "./IOracleProofReceiver.sol";
 contract SecondOpinionOracle is ISecondOpinionOracle, IOracleProofReceiver {
     /// @notice RISC Zero verifier contract address.
     IRiscZeroVerifier public immutable verifier;
+    uint256 public immutable genesis_block_timestamp;
 
     /// @notice Image ID of the only zkVM guest to accept verification from.
     bytes32 public constant imageId = ImageID.BALANCE_AND_EXITS_ID;
@@ -34,13 +35,14 @@ contract SecondOpinionOracle is ISecondOpinionOracle, IOracleProofReceiver {
     mapping(uint256 => Report) public reports;
 
     /// @notice Initialize the contract, binding it to a specified RISC Zero verifier.
-    constructor(IRiscZeroVerifier _verifier) {
+    constructor(IRiscZeroVerifier _verifier, uint256 _genesis_block_timestamp) {
         verifier = _verifier;
+        genesis_block_timestamp = _genesis_block_timestamp;
     }
 
     /// @notice Set an oracle report for a given slot by verifying the ZK proof
     function update(uint256 refSlot, Report calldata r, bytes calldata seal) external {
-        bytes32 blockRoot = BlockRoots.findBlockRoot(refSlot);
+        bytes32 blockRoot = BlockRoots.findBlockRoot(genesis_block_timestamp, refSlot);
 
         bytes memory journal = abi.encodePacked(
             blockRoot, r.clBalanceGwei, r.withdrawalVaultBalanceWei, r.totalDepositedValidators, r.totalExitedValidators
@@ -48,7 +50,7 @@ contract SecondOpinionOracle is ISecondOpinionOracle, IOracleProofReceiver {
         verifier.verify(seal, imageId, sha256(journal));
 
         // report is now considered valid for the given slot and can be stored
-        reports[block.number] = r;
+        reports[refSlot] = r;
     }
 
     /// @notice Returns the number stored.

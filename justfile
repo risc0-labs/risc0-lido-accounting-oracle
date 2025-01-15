@@ -34,3 +34,11 @@ prove_aggregate slot: build
 submit slot: build
     ./target/release/cli --slot {{slot}} submit --proof ./aggregate_proof_{{slot}}.bin
 
+## helper for doing all the steps
+
+prove_all slot: (build_input_initialization slot) (prove_membership_init slot) (build_input_aggregation slot) (prove_aggregate slot)
+
+# Deploy contracts
+
+deploy:
+    cd contracts && forge script script/Deploy.s.sol --rpc-url $ETH_RPC_URL --broadcast

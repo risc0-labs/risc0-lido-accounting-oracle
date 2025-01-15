@@ -65,7 +65,7 @@ pub fn main() {
 
     let withdrawal_vault_balance: u64 = 0; // TODO: Calculate withdrawal vault balance using Steel
 
-    // write the outputs in ABI packed compatible format
+    // write the outputs in ABI compatible format
     env::commit_slice(&block_root.abi_encode());
     env::commit_slice(&cl_balance.abi_encode());
     env::commit_slice(&withdrawal_vault_balance.abi_encode());

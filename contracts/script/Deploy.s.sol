@@ -24,6 +24,7 @@ import {RiscZeroGroth16Verifier} from "risc0/groth16/RiscZeroGroth16Verifier.sol
 import {ControlID} from "risc0/groth16/ControlID.sol";
 
 import {SecondOpinionOracle} from "../src/SecondOpinionOracle.sol";
+import {TestVerifier} from "../src/TestVerifier.sol";
 
 /// @notice Deployment script for the RISC Zero starter project.
 /// @dev Use the following environment variable to control the deployment:
@@ -95,8 +96,15 @@ contract Deploy is Script, RiscZeroCheats {
         }
 
         // Deploy the application contract.
-        SecondOpinionOracle oracle = new SecondOpinionOracle(verifier);
-        console2.log("Deployed EvenNumber to", address(oracle));
+        string memory profileKey = string.concat(".profile.", configProfile);
+        uint256 genesisTimestamp = stdToml.readUint(config, string.concat(profileKey, ".genesisBlockTimestamp"));
+        console2.log("Using genesis timestamp", genesisTimestamp);
+
+        SecondOpinionOracle oracle = new SecondOpinionOracle(verifier, genesisTimestamp);
+        console2.log("Deployed SecondOpinionOracle to", address(oracle));
+
+        TestVerifier testVerifier = new TestVerifier(verifier);
+        console2.log("Deployed TestVerifier to", address(testVerifier));
 
         vm.stopBroadcast();
     }

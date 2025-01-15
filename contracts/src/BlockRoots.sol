@@ -6,10 +6,7 @@ library BlockRoots {
     error TimestampOutOfRange();
     error NoBlockRootFound();
 
-    /// @notice The genesis block timestamp for eth mainnet.
-    uint256 public constant GENESIS_BLOCK_TIMESTAMP = 1606824000;
-
-    /// @notice The address of the beacon roots precompile.
+    /// @notice The address of the beacon roots precompile (regardless of chain).
     /// @dev https://eips.ethereum.org/EIPS/eip-4788
     address internal constant BEACON_ROOTS = 0x000F3df6D732807Ef1319fB7B8bB8522d0Beac02;
 
@@ -22,12 +19,12 @@ library BlockRoots {
     /// @dev BEACON_ROOTS returns a block root for a given parent block's timestamp. To get the block root for slot
     ///      N, you use the timestamp of slot N+1. If N+1 is not avaliable, you use the timestamp of slot N+2, and
     //       so on.
-    function findBlockRoot(uint256 _slot) internal view returns (bytes32 blockRoot) {
-        uint256 currBlockTimestamp = GENESIS_BLOCK_TIMESTAMP + ((_slot + 1) * 12);
+    function findBlockRoot(uint256 _genesis_block_timestamp, uint256 _slot) internal view returns (bytes32 blockRoot) {
+        uint256 currBlockTimestamp = _genesis_block_timestamp + ((_slot + 1) * 12);
 
         uint256 earliestBlockTimestamp = block.timestamp - (BEACON_ROOTS_HISTORY_BUFFER_LENGTH * 12);
         if (currBlockTimestamp <= earliestBlockTimestamp) {
-            revert TimestampOutOfRange();
+            revert("Timestamp out of range");
         }
 
         while (currBlockTimestamp <= block.timestamp) {
@@ -41,6 +38,6 @@ library BlockRoots {
             }
         }
 
-        revert NoBlockRootFound();
+        revert("Block root not found");
     }
 }
