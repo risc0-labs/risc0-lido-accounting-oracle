@@ -5,7 +5,7 @@ edition = { workspace = true }
 
 [features]
 default = []
-sepolia = ["guest-io/sepolia"]
+sepolia = ["guest-io/sepolia", "membership_builder/sepolia"]
 
 [dependencies]
 ssz-multiproofs.workspace = true

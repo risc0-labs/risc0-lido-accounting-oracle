@@ -112,6 +112,14 @@ Building proofs requires access to a beacon chain RPC (that supports the `debug_
 
 These are configured via environment variables. Copy the [.env.example] to a .env file in the repo root and configure for your remote services.
 
+--- 
+
+By default the repo builds the CLI and guest for mainnet but it also has a feature to configure it to work with Sepolia. Use 
+
+```shell
+cargo build --release --features "seplolia"
+```
+
 ### Contract Deployment
 
 Simple deployment with

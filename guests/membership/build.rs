@@ -24,11 +24,20 @@ fn main() {
         root_dir: Some("../".into()),
     });
 
+    let guest_features = env::var("CARGO_FEATURE_SEPOLIA")
+        .map(|_| vec!["sepolia".into()])
+        .unwrap_or_default();
+
+    println!(
+        "cargo:warning=building guest with features: {:?}",
+        guest_features
+    );
+
     // Generate Rust source files for the methods crate.
     embed_methods_with_options(HashMap::from([(
         "validator_membership",
         GuestOptions {
-            features: vec!["sepolia".into()],
+            features: guest_features,
             use_docker: use_docker.clone(),
         },
     )]));

@@ -3,6 +3,9 @@ name = "membership_builder"
 version = { workspace = true }
 edition = { workspace = true }
 
+[features]
+sepolia = []
+
 [package.metadata.risc0]
 methods = ["guest"]
 
