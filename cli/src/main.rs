@@ -23,6 +23,7 @@ use balance_and_exits_builder::{BALANCE_AND_EXITS_ELF, BALANCE_AND_EXITS_ID};
 use beacon_client::BeaconClient;
 use clap::Parser;
 use ethereum_consensus::phase0::mainnet::{HistoricalBatch, SLOTS_PER_HISTORICAL_ROOT};
+use guest_io::WITHDRAWAL_CREDENTIALS;
 use membership_builder::{VALIDATOR_MEMBERSHIP_ELF, VALIDATOR_MEMBERSHIP_ID};
 use risc0_ethereum_contracts::encode_seal;
 use risc0_zkvm::{default_prover, ExecutorEnv, ProverOpts, Receipt, VerifierContext};
@@ -275,6 +276,16 @@ async fn build_membership_input(
     let beacon_state = beacon_client.get_beacon_state(slot).await?;
 
     tracing::info!("Total validators: {}", beacon_state.validators().len());
+    tracing::info!(
+        "Lido validators: {}",
+        beacon_state
+            .validators()
+            .iter()
+            .filter(
+                |validator| validator.withdrawal_credentials.as_slice() == WITHDRAWAL_CREDENTIALS
+            )
+            .count()
+    );
 
     let max_validator_index =
         max_validator_index.unwrap_or((beacon_state.validators().len() - 1) as u64);

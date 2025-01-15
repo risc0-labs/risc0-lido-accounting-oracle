@@ -4,6 +4,9 @@ edition = "2021"
 
 [workspace]
 
+[features]
+sepolia = ["guest-io/sepolia"]
+
 [dependencies]
 guest-io = { path = "../../../crates/guest-io", default-features = false }
 gindices = { path = "../../../crates/gindices" }

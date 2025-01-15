@@ -3,6 +3,10 @@ name = "cli"
 version = { workspace = true }
 edition = { workspace = true }
 
+[features]
+default = []
+sepolia = ["guest-io/sepolia"]
+
 [dependencies]
 ssz-multiproofs.workspace = true
 guest-io = { workspace = true, features = ["builder", "progress-bar"] }

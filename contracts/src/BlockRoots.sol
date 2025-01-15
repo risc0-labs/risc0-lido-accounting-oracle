@@ -24,7 +24,7 @@ library BlockRoots {
 
         uint256 earliestBlockTimestamp = block.timestamp - (BEACON_ROOTS_HISTORY_BUFFER_LENGTH * 12);
         if (currBlockTimestamp <= earliestBlockTimestamp) {
-            revert("Timestamp out of range");
+            revert TimestampOutOfRange();
         }
 
         while (currBlockTimestamp <= block.timestamp) {
@@ -38,6 +38,6 @@ library BlockRoots {
             }
         }
 
-        revert("Block root not found");
+        revert NoBlockRootFound();
     }
 }

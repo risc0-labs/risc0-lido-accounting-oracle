@@ -112,43 +112,65 @@ Building proofs requires access to a beacon chain RPC (that supports the `debug_
 
 These are configured via environment variables. Copy the [.env.example] to a .env file in the repo root and configure for your remote services.
 
+### Contract Deployment
+
+Simple deployment with
+
+```shell
+just deploy
+```
+
+This will read the .env file for RPC and other params.
+
+See the [deployment guide](./docs/deployment-guide.md) for instructions on deploying to different chains
+
 ### Simple Usage via CLI
 
-Using the justfile scripts provides a simple way to get started and examples of using the CLI. 
+Using the justfile scripts provides a simple way to get started and examples of using the CLI. These will write intermediate files into the current directory.
+These are mostly included for example usage of the CLI. For a production deployment use the CLI directly as required.
 
 #### Initial membership proof
 
 To create an initial membership proof for a given slot (e.g. slot 1000) run
 
 ```shell
-just initialize_membership 1000
+just build_input_initialization 1000
+prove_membership_init 1000
 ```
 
 > [!WARNING]
-> Attempting to initialize at a recent slot with many validators will be slow and may exceed the ZKVM memory limit. Better to progressively build up the proof using recursion. Updates between Oracle reports (days) will be quite fast
+> Attempting to initialize at a recent slot with many validators will be slow and may exceed the ZKVM memory limit if not split correctly with --max-validator-index
 
 #### Updating a membership proof
 
-Update an existing membership proof with
+Update an existing membership proof to slot 1100 run
 
 ```shell
-just update_membership 1000 1100
+just build_input_continuation 1000 1100
+just prove_membership_continuation 1000 1100
 ```
 
-where 1000 is the prior slot and 1100 is the next slot. This will write a new proof that composes the old one and proves the membership of all validators up to slot 1100.
+This will write a new proof that composes the old one and proves the membership of all validators up to slot 1100. There is no need to update membership proofs but it is a good way to save proving cycles.
 
 #### Building an aggregate oracle proof
 
 To build a proof ready to submit on-chain run:
 
 ```shell
-just aggregate 1100
+just build_input_aggregation 1100
+just prove_aggregate 1100
 ```
 
-This requires that a membership proof for slot 1100 has already been created. It will write to file a proof and report ready to submit on-chain
+This requires that a membership proof (either initial or continuation) for slot 1100 has already been created. It will write to file a proof and report ready to submit on-chain
 
 > [!NOTE]
 > For slots containing many Lido validators this will take a long time to build the SSZ proof input locally (hours) and to generate the proof (minutes on Bonsai)
+
+Submit on-chain with:
+
+```shell
+just submit 1100
+```
 
 #### More advanced usage
 
@@ -158,25 +180,25 @@ Using the CLI directly provides more flexibility. See the help and subcommands h
 > cargo run --help
 CLI for generating and submitting Lido oracle proofs
 
-Usage: cli [OPTIONS] --beacon-rpc-url <BEACON_RPC_URL> --slot <SLOT> <COMMAND>
+Usage: cli [OPTIONS] --slot <SLOT> <COMMAND>
 
 Commands:
-  membership  Generate or update a membership proof
-  aggregate   Produce the final oracle proof to go on-chain
-  help        Print this message or the help of the given subcommand(s)
+  build   Build an input for a proof
+  prove   Generate a proof from a given input
+  submit  Submit an aggregation proof to the oracle contract
+  help    Print this message or the help of the given subcommand(s)
 
 Options:
-      --beacon-rpc-url <BEACON_RPC_URL>
-          Ethereum beacon node HTTP RPC endpoint [env: BEACON_RPC_URL=]
       --slot <SLOT>
           slot at which to base the proofs
-      --input-data <INPUT_DATA>
+      --max-validator-index <MAX_VALIDATOR_INDEX>
+          The top validator index proofs  will be extended to. If not included it will proceed up to the total number of validators in the beacon state at the given slot. This does nothing for aggregation proofs which must be run for all validators
+  -h, --help
+          Print help
+  -V, --version
+          Print version
 ```
 
-
-## Deployment
-
-See the [deployment guide](./docs/deployment-guide.md) for instructions on deploying the oracle contracts
 
 ## Security Disclaimer
 

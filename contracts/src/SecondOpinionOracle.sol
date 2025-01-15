@@ -34,6 +34,9 @@ contract SecondOpinionOracle is ISecondOpinionOracle, IOracleProofReceiver {
     /// @notice Oracle reports stored by refSlot.
     mapping(uint256 => Report) public reports;
 
+    /// @notice Emitted when a new report is stored.
+    event ReportUpdated(uint256 refSlot, Report r);
+
     /// @notice Initialize the contract, binding it to a specified RISC Zero verifier.
     constructor(IRiscZeroVerifier _verifier, uint256 _genesis_block_timestamp) {
         verifier = _verifier;
@@ -51,6 +54,7 @@ contract SecondOpinionOracle is ISecondOpinionOracle, IOracleProofReceiver {
 
         // report is now considered valid for the given slot and can be stored
         reports[refSlot] = r;
+        emit ReportUpdated(refSlot, r);
     }
 
     /// @notice Returns the number stored.

@@ -28,7 +28,7 @@ fn main() {
     embed_methods_with_options(HashMap::from([(
         "validator_membership",
         GuestOptions {
-            features: Vec::new(),
+            features: vec!["sepolia".into()],
             use_docker: use_docker.clone(),
         },
     )]));
