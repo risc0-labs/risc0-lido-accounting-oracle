@@ -1,7 +1,7 @@
 use crate::multiproof::calculate_max_stack_depth;
 use crate::{Descriptor, Multiproof, Result};
 #[cfg(feature = "progress-bar")]
-use indicatif::{ParallelProgressIterator, ProgressBar, ProgressIterator, ProgressStyle};
+use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use ssz_rs::prelude::{GeneralizedIndex, GeneralizedIndexable, Path, Prove};
 use ssz_rs::proofs::Prover;
@@ -93,8 +93,8 @@ impl MultiproofBuilder {
             .collect::<Result<Vec<_>>>()?;
 
         #[cfg(feature = "progress-bar")]
-        let value_mask = proof_indices
-            .iter()
+        let value_mask: Vec<bool> = proof_indices
+            .par_iter()
             .progress_with(new_progress_bar(
                 "Computing value mask",
                 proof_indices.len(),
@@ -103,8 +103,8 @@ impl MultiproofBuilder {
             .collect();
 
         #[cfg(not(feature = "progress-bar"))]
-        let value_mask = proof_indices
-            .iter()
+        let value_mask: Vec<bool> = proof_indices
+            .par_iter()
             .map(|index| gindices.contains(index))
             .collect();
 
@@ -114,7 +114,7 @@ impl MultiproofBuilder {
         Ok(Multiproof {
             nodes,
             descriptor,
-            value_mask,
+            value_mask: value_mask.iter().collect(),
             max_stack_depth,
         })
     }

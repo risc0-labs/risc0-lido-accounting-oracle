@@ -39,7 +39,13 @@ sha2 = "0.10.8"
 tracing = "0.1.41"
 
 [profile.release]
-debug = 1
+opt-level = 3 # Optimize for build time and code size; use "3" for maximum runtime performance
+codegen-units = 16 # Increases parallelism in code generation
+debug = false # Disable debug information to speed up builds
+lto = false # Link Time Optimization disabled for faster linking
+panic = "unwind" # Keeps unwinding for better build speed; "abort" is faster but changes behavior
+incremental = false # Disable incremental compilation for deterministic builds
+overflow-checks = false # Skip overflow checks for better performance
 
 [patch."https://github.com/ralexstokes/ssz-rs"]
 # Get the merkle tree empty node virtualization so non-trivial merkle trees actually fit in memory
