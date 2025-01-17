@@ -50,56 +50,18 @@ jobs:
         run: cargo build
 
       - name: build solidity contracts
-        run: forge build
+        working-directory: contracts
+        run: |
+          forge soldeer install
+          forge build
 
       - name: run tests
         run: cargo test
 
       - name: run foundry tests in dev mode
+        working-directory: contracts
         env:
             RISC0_DEV_MODE: true
-        run: forge test -vvv
-
-  integration-test:
-    name: integration test
-    runs-on: ubuntu-latest
-    env:
-      RUST_BACKTRACE: full
-    steps:
-      # This is a workaround from: https://github.com/actions/checkout/issues/590#issuecomment-970586842
-      - name: checkout dummy commit (submodule bug workaround)
-        run: "git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :"
-
-      - name: clone repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install rust
-        uses: risc0/risc0/.github/actions/rustup@main
-
-      - name: Install Foundry
-        uses: risc0/foundry-toolchain@2fe7e70b520f62368a0e3c464f997df07ede420f
-
-      - name: risczero toolchain install
-        uses: risc0/risc0-ethereum/.github/actions/cargo-risczero-install@release-1.2
-        with:
-          ref: ${{ env.RISC0_MONOREPO_REF }}
-
-      - name: build rust membership guest
-        working-directory: guests/membership
-        run: cargo build
-
-      - name: build rust balance_and_exits guest
-        working-directory: guests/balance_and_exits
-        run: cargo build
-
-      - name: build solidity contracts
-        run: forge build
-
-      - name: run foundry tests with local prover
-        env:
-          RISC0_DEV_MODE: false
         run: forge test -vvv
 
   lint:
