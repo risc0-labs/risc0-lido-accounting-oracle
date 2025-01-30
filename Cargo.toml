@@ -5,6 +5,7 @@ members = ["cli", "guests/membership", "guests/balance_and_exits", "crates/ssz-m
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
+license = "Apache-2.0"
 
 [workspace.dependencies]
 gindices.path = "./crates/gindices"
