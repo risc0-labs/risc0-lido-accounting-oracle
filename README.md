@@ -55,10 +55,16 @@ The balance and exits proof proves computation of the aggregation of the total b
 
 ```
 GIVEN:
-    - TODO
+    - membership set and proof
+    - block root
+    - SSZ merkle proof for the state root within the block
+    - SSZ merkle proof for all required state values
+        - balance and exit epoch for all membership validators
+    - the asserted clBalance, totalDepositedValidators and totalExitedValidators values
 
 ASSERTS:
-    - The membership set is correct at the current state and has size equal to the total number of validators in the state
+    - The membership proof is valid
+    - The number of validators in the membership set is equal to the total number of validators
     - The given state root is contained within the block header with the given block root
     - The aggregates clBalance, totalDepositedValidators, totalExitedValidators can be calculated by processing the data for all Lido validators indicated by the membership set
     - All beacon data is contained in the beacon state with the given state root
