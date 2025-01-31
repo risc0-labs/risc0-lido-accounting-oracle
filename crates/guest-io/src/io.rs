@@ -15,6 +15,7 @@
 use alloy_primitives::B256;
 use bitvec::prelude::*;
 use risc0_zkvm::sha::Digest;
+#[cfg(not(feature = "builder"))]
 use ssz_multiproofs::Multiproof;
 #[cfg(feature = "builder")]
 use {
@@ -25,7 +26,7 @@ use {
         beacon_block as beacon_block_gindices, beacon_state as beacon_state_gindices,
         beacon_state::SLOTS_PER_HISTORICAL_ROOT, historical_batch as historical_batch_gindices,
     },
-    ssz_multiproofs::MultiproofBuilder,
+    ssz_multiproofs::{MultiproofBuilder, MultiproofOwnedData},
     ssz_rs::prelude::*,
 };
 
@@ -33,6 +34,31 @@ pub mod validator_membership {
 
     use super::*;
 
+    #[cfg(not(feature = "builder"))]
+    #[derive(Debug, serde::Deserialize)]
+    pub struct Input<'a> {
+        /// The Program ID of this program. Need to accept it as input rather than hard-code otherwise it creates a cyclic hash reference
+        /// This MUST be written to the journal and checked by the verifier! See https://github.com/risc0/risc0-ethereum/blob/main/contracts/src/RiscZeroSetVerifier.sol#L114
+        pub self_program_id: Digest,
+
+        /// The state root of the state used in the current proof
+        pub state_root: B256,
+
+        /// the top validator index the membership proof will be extended to
+        pub max_validator_index: u64,
+
+        /// If this the first proof in the sequence, or a continuation that consumes an existing proof
+        pub proof_type: ProofType,
+
+        /// Merkle SSZ proof rooted in the beacon state
+        #[serde(borrow)]
+        pub multiproof: Multiproof<'a>,
+
+        /// Merkle SSZ proof rooted in an intermediate beacon state
+        pub hist_summary_multiproof: Option<Multiproof<'a>>,
+    }
+
+    #[cfg(feature = "builder")]
     #[derive(Debug, serde::Serialize, serde::Deserialize)]
     pub struct Input {
         /// The Program ID of this program. Need to accept it as input rather than hard-code otherwise it creates a cyclic hash reference
@@ -49,7 +75,10 @@ pub mod validator_membership {
         pub proof_type: ProofType,
 
         /// Merkle SSZ proof rooted in the beacon state
-        pub multiproof: Multiproof,
+        pub multiproof: MultiproofOwnedData,
+
+        /// Merkle SSZ proof rooted in an intermediate beacon state
+        pub hist_summary_multiproof: Option<MultiproofOwnedData>,
     }
 
     #[cfg(feature = "builder")]
@@ -77,6 +106,7 @@ pub mod validator_membership {
                 max_validator_index,
                 proof_type: ProofType::Initial,
                 multiproof,
+                hist_summary_multiproof: None,
             })
         }
 
@@ -116,12 +146,12 @@ pub mod validator_membership {
                 })
                 .collect::<BitVec<u32, Lsb0>>();
 
-            let cont_type = if slot == prior_slot {
-                ContinuationType::SameSlot
+            let (cont_type, hist_summary_multiproof) = if slot == prior_slot {
+                (ContinuationType::SameSlot, None)
             } else if slot <= prior_slot + SLOTS_PER_HISTORICAL_ROOT {
                 proof_builder = proof_builder
                     .with_gindex(beacon_state_gindices::state_roots(prior_slot).try_into()?);
-                ContinuationType::ShortRange
+                (ContinuationType::ShortRange, None)
             } else if let Some(historical_batch) = historical_batch {
                 proof_builder = proof_builder.with_gindex(
                     beacon_state_gindices::historical_summaries(prior_slot).try_into()?,
@@ -129,9 +159,7 @@ pub mod validator_membership {
                 let hist_summary_multiproof = MultiproofBuilder::new()
                     .with_gindex(historical_batch_gindices::state_roots(prior_slot).try_into()?)
                     .build(historical_batch)?;
-                ContinuationType::LongRange {
-                    hist_summary_multiproof,
-                }
+                (ContinuationType::LongRange, Some(hist_summary_multiproof))
             } else {
                 return Err(Error::MissingHistoricalBatch);
             };
@@ -150,6 +178,7 @@ pub mod validator_membership {
                     cont_type,
                 },
                 multiproof,
+                hist_summary_multiproof,
             })
         }
     }
@@ -184,7 +213,7 @@ pub mod validator_membership {
     pub enum ContinuationType {
         SameSlot,
         ShortRange,
-        LongRange { hist_summary_multiproof: Multiproof },
+        LongRange,
     }
 
     #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -199,6 +228,25 @@ pub mod validator_membership {
 pub mod balance_and_exits {
     use super::*;
 
+    #[cfg(not(feature = "builder"))]
+    #[derive(Debug, serde::Deserialize)]
+    pub struct Input<'a> {
+        /// Block that the proof is rooted in
+        pub block_root: B256,
+
+        /// Bitfield indicating which validators are members of the Lido set
+        pub membership: BitVec<u32, Lsb0>,
+
+        /// Merkle SSZ proof rooted in the beacon block
+        #[serde(borrow)]
+        pub block_multiproof: Multiproof<'a>,
+
+        /// Merkle SSZ proof rooted in the beacon state
+        #[serde(borrow)]
+        pub state_multiproof: Multiproof<'a>,
+    }
+
+    #[cfg(feature = "builder")]
     #[derive(Debug, serde::Serialize, serde::Deserialize)]
     pub struct Input {
         /// Block that the proof is rooted in
@@ -208,10 +256,10 @@ pub mod balance_and_exits {
         pub membership: BitVec<u32, Lsb0>,
 
         /// Merkle SSZ proof rooted in the beacon block
-        pub block_multiproof: Multiproof,
+        pub block_multiproof: MultiproofOwnedData,
 
         /// Merkle SSZ proof rooted in the beacon state
-        pub state_multiproof: Multiproof,
+        pub state_multiproof: MultiproofOwnedData,
     }
 
     #[cfg(feature = "builder")]
@@ -265,7 +313,7 @@ pub mod balance_and_exits {
 fn build_with_versioned_state(
     builder: MultiproofBuilder,
     beacon_state: &BeaconState,
-) -> Result<Multiproof> {
+) -> Result<MultiproofOwnedData> {
     match beacon_state {
         BeaconState::Phase0(b) => Ok(builder.build(b)?),
         BeaconState::Altair(b) => Ok(builder.build(b)?),

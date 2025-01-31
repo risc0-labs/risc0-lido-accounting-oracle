@@ -14,6 +14,7 @@
 
 use std::usize;
 
+use bincode::deserialize;
 use bitvec::prelude::*;
 use gindices::presets::mainnet::beacon_state::{self as beacon_state_gindices};
 use gindices::presets::mainnet::historical_batch as historical_batch_gindices;
@@ -35,13 +36,16 @@ pub fn main() {
         .event_format(Risc0Formatter)
         .init();
 
+    let input_bytes = env::read_frame();
+
     let Input {
         multiproof,
         state_root,
         proof_type,
         self_program_id,
         max_validator_index,
-    } = env::read::<Input>();
+        hist_summary_multiproof,
+    } = deserialize(&input_bytes).expect("Failed to deserialize input");
 
     // verify the multi-proof which verifies leaf values
     multiproof
@@ -68,12 +72,13 @@ pub fn main() {
                         .unwrap();
                     assert_eq!(stored_root, &prior_state_root);
                 }
-                LongRange {
-                    hist_summary_multiproof,
-                } => {
+                LongRange => {
+                    let hist_summary_multiproof = hist_summary_multiproof.expect(
+                        "Missing historical summary multiproof for a long range continuation",
+                    );
                     let historical_summary_root =
                         multiproof // using a get here for now but this does cause an extra iteration through the values :(
-                            .get(beacon_state_gindices::historical_summaries(
+                            .get::<32>(beacon_state_gindices::historical_summaries(
                                 prior_slot,
                             ))
                             .unwrap();

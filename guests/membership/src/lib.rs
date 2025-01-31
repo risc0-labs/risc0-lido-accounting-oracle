@@ -38,8 +38,9 @@ mod tests {
             max_validator_index as u64,
             super::VALIDATOR_MEMBERSHIP_ID,
         )?;
-
-        let env = ExecutorEnv::builder().write(&input)?.build()?;
+        let input_bytes = bincode::serialize(&input).unwrap();
+        println!("input length: {}", input_bytes.len());
+        let env = ExecutorEnv::builder().write_frame(&input_bytes).build()?;
 
         println!("Starting execution of the program");
         let session_info = default_executor().execute(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
@@ -64,7 +65,9 @@ mod tests {
 
         let input =
             validator_membership::Input::build_initial(&s1, 500, super::VALIDATOR_MEMBERSHIP_ID)?;
-        let env = ExecutorEnv::builder().write(&input)?.build()?;
+        let env = ExecutorEnv::builder()
+            .write_frame(&bincode::serialize(&input).unwrap())
+            .build()?;
         let session_info = default_executor().execute(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
 
         let input = validator_membership::Input::build_continuation(
@@ -77,7 +80,7 @@ mod tests {
         )?;
         let env = ExecutorEnv::builder()
             .add_assumption(session_info.receipt_claim.unwrap())
-            .write(&input)?
+            .write_frame(&bincode::serialize(&input).unwrap())
             .build()?;
         let session_info = default_executor().execute(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
 
@@ -102,7 +105,9 @@ mod tests {
 
         let input =
             validator_membership::Input::build_initial(&s1, 500, super::VALIDATOR_MEMBERSHIP_ID)?;
-        let env = ExecutorEnv::builder().write(&input)?.build()?;
+        let env = ExecutorEnv::builder()
+            .write_frame(&bincode::serialize(&input).unwrap())
+            .build()?;
         let session_info = default_executor().execute(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
 
         let input = validator_membership::Input::build_continuation(
@@ -115,7 +120,7 @@ mod tests {
         )?;
         let env = ExecutorEnv::builder()
             .add_assumption(session_info.receipt_claim.unwrap())
-            .write(&input)?
+            .write_frame(&bincode::serialize(&input).unwrap())
             .build()?;
 
         let session_info = default_executor().execute(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
@@ -139,7 +144,9 @@ mod tests {
 
         let input =
             validator_membership::Input::build_initial(&s1, 500, super::VALIDATOR_MEMBERSHIP_ID)?;
-        let env = ExecutorEnv::builder().write(&input)?.build()?;
+        let env = ExecutorEnv::builder()
+            .write_frame(&bincode::serialize(&input).unwrap())
+            .build()?;
         let session_info = default_executor().execute(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
 
         let input = validator_membership::Input::build_continuation(
@@ -152,7 +159,7 @@ mod tests {
         )?;
         let env = ExecutorEnv::builder()
             .add_assumption(session_info.receipt_claim.unwrap())
-            .write(&input)?
+            .write_frame(&bincode::serialize(&input).unwrap())
             .build()?;
 
         let session_info = default_executor().execute(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
