@@ -26,6 +26,8 @@ use ssz_multiproofs::ValueIterator;
 use tracing_risc0::Risc0Formatter;
 use tracing_subscriber::fmt::format::FmtSpan;
 
+type Node = [u8; 32];
+
 pub fn main() {
     tracing_subscriber::fmt()
         .with_span_events(FmtSpan::ENTER | FmtSpan::EXIT)
@@ -82,24 +84,22 @@ pub fn main() {
     env::commit_slice(&num_exited_validators.abi_encode());
 }
 
-fn get_slot<'a, I: Iterator<Item = (u64, &'a [u8; 32])>>(
-    values: &mut ValueIterator<'a, I, 32>,
-) -> u64 {
+fn get_slot<'a, I: Iterator<Item = (u64, &'a Node)>>(values: &mut ValueIterator<'a, I, 32>) -> u64 {
     let slot = values
         .next_assert_gindex(beacon_block_gindices::slot())
         .unwrap();
     u64_from_b256(slot, 0)
 }
 
-fn get_state_root<'a, I: Iterator<Item = (u64, &'a [u8; 32])>>(
+fn get_state_root<'a, I: Iterator<Item = (u64, &'a Node)>>(
     values: &mut ValueIterator<'a, I, 32>,
-) -> &'a [u8; 32] {
+) -> &'a Node {
     values
         .next_assert_gindex(beacon_block_gindices::state_root())
         .unwrap()
 }
 
-fn get_validator_count<'a, I: Iterator<Item = (u64, &'a [u8; 32])>>(
+fn get_validator_count<'a, I: Iterator<Item = (u64, &'a Node)>>(
     values: &mut ValueIterator<'a, I, 32>,
 ) -> u64 {
     let validator_count = values
@@ -109,7 +109,7 @@ fn get_validator_count<'a, I: Iterator<Item = (u64, &'a [u8; 32])>>(
 }
 
 #[tracing::instrument(skip(values, membership))]
-fn count_exited_validators<'a, I: Iterator<Item = (u64, &'a [u8; 32])>>(
+fn count_exited_validators<'a, I: Iterator<Item = (u64, &'a Node)>>(
     values: &mut ValueIterator<'a, I, 32>,
     membership: &BitVec<u32, Lsb0>,
     slot: u64,
@@ -131,7 +131,7 @@ fn count_exited_validators<'a, I: Iterator<Item = (u64, &'a [u8; 32])>>(
 }
 
 #[tracing::instrument(skip(values, membership))]
-fn accumulate_balances<'a, I: Iterator<Item = (u64, &'a [u8; 32])>>(
+fn accumulate_balances<'a, I: Iterator<Item = (u64, &'a Node)>>(
     values: &mut ValueIterator<'a, I, 32>,
     membership: &BitVec<u32, Lsb0>,
 ) -> u64 {
@@ -156,6 +156,6 @@ fn accumulate_balances<'a, I: Iterator<Item = (u64, &'a [u8; 32])>>(
 
 /// Slice an 8 byte u64 out of a 32 byte chunk
 /// pos gives the position (e.g. first 8 bytes, second 8 bytes, etc.)
-fn u64_from_b256(node: &[u8; 32], pos: usize) -> u64 {
+fn u64_from_b256(node: &Node, pos: usize) -> u64 {
     u64::from_le_bytes(node[pos * 8..(pos + 1) * 8].try_into().unwrap())
 }
