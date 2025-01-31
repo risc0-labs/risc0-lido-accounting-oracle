@@ -59,9 +59,17 @@ pub fn main() {
     let num_exited_validators = count_exited_validators(&mut values, &membership, slot);
 
     let validator_count = get_validator_count(&mut values);
-    verify_membership(&state_root, &membership, validator_count);
 
-    let cl_balance = accumulate_balances(&mut values, &membership);
+    let j = MembershipJounal {
+        self_program_id: VALIDATOR_MEMBERSHIP_ID.into(),
+        state_root: state_root.clone(),
+        membership: membership,
+        max_validator_index: validator_count - 1,
+    };
+    env::verify(VALIDATOR_MEMBERSHIP_ID, &serde::to_vec(&j).unwrap())
+        .expect("Failed to verify membership bitvec");
+
+    let cl_balance = accumulate_balances(&mut values, &j.membership);
 
     let withdrawal_vault_balance: u64 = 0; // TODO: Calculate withdrawal vault balance using Steel
 
@@ -95,19 +103,6 @@ fn get_validator_count<'a, I: Iterator<Item = (u64, &'a B256)>>(
         .next_assert_gindex(beacon_state_gindices::validator_count())
         .unwrap();
     u64_from_b256(validator_count, 0)
-}
-
-#[tracing::instrument(skip(membership))]
-fn verify_membership(state_root: &B256, membership: &BitVec<u32, Lsb0>, validator_count: u64) {
-    let max_validator_index = validator_count - 1;
-    let j = MembershipJounal {
-        self_program_id: VALIDATOR_MEMBERSHIP_ID.into(),
-        state_root: state_root.clone(),
-        membership: membership.clone(),
-        max_validator_index,
-    };
-    env::verify(VALIDATOR_MEMBERSHIP_ID, &serde::to_vec(&j).unwrap())
-        .expect("Failed to verify membership bitvec");
 }
 
 #[tracing::instrument(skip(values, membership))]
