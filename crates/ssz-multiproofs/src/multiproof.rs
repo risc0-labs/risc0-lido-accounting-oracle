@@ -16,7 +16,7 @@ use bitvec::prelude::*;
 use sha2::{Digest, Sha256};
 
 use crate::error::{Error, Result};
-use crate::{Descriptor, Node};
+use crate::Descriptor;
 
 /// An abstraction around a SSZ merkle multi-proof
 ///
@@ -28,9 +28,9 @@ use crate::{Descriptor, Node};
 /// This will NOT be the order they were added or increasing order of gindex, it will depend on the shape of the data structure.
 ///
 #[derive(Debug, PartialEq, Default, serde::Serialize, serde::Deserialize)]
-pub struct Multiproof {
+pub struct Multiproof<'a> {
     /// The merkle tree nodes corresponding to both leaves and internal proof nodes
-    pub(crate) nodes: Vec<Node>,
+    pub(crate) data: &'a [u8],
 
     /// mask indicating which nodes are values (1) or proof supporting nodes (0)
     pub(crate) value_mask: BitVec<u32, Lsb0>,
@@ -42,11 +42,11 @@ pub struct Multiproof {
     pub(crate) max_stack_depth: usize,
 }
 
-impl Multiproof {
+impl<'a> Multiproof<'a> {
     /// Verify this multi-proof against a given root
     #[tracing::instrument(skip(self))]
-    pub fn verify(&self, root: &Node) -> Result<()> {
-        if self.calculate_root()? == *root {
+    pub fn verify<const CHUNK_SIZE: usize>(&self, root: &[u8; CHUNK_SIZE]) -> Result<()> {
+        if self.calculate_root::<CHUNK_SIZE>()? == *root {
             Ok(())
         } else {
             Err(Error::RootMismatch)
@@ -54,19 +54,29 @@ impl Multiproof {
     }
 
     /// Calculate the root of this multi-proof
-    pub fn calculate_root(&self) -> Result<Node> {
-        calculate_compact_multi_merkle_root(&self.nodes, &self.descriptor, self.max_stack_depth)
+    pub fn calculate_root<const CHUNK_SIZE: usize>(&self) -> Result<[u8; CHUNK_SIZE]> {
+        calculate_compact_multi_merkle_root::<CHUNK_SIZE>(
+            &self.data,
+            &self.descriptor,
+            self.max_stack_depth,
+        )
     }
 
     /// Creates an iterator the nodes in this proof along with their gindices
-    pub fn nodes(&self) -> impl Iterator<Item = (u64, &Node)> {
-        GIndexIterator::new(&self.descriptor).zip(self.nodes.iter())
+    pub fn nodes<const CHUNK_SIZE: usize>(&self) -> impl Iterator<Item = (u64, &[u8; CHUNK_SIZE])> {
+        let nodes = self.data.chunks_exact(CHUNK_SIZE).map(|chunk| {
+            let array: &[u8; CHUNK_SIZE] = chunk.try_into().expect("Chunk size mismatch");
+            array
+        });
+        GIndexIterator::new(&self.descriptor).zip(nodes)
     }
 
     /// Creates an iterator the values in this proof along with their gindices
-    pub fn values(&self) -> ValueIterator<impl Iterator<Item = (u64, &Node)>> {
+    pub fn values<const CHUNK_SIZE: usize>(
+        &self,
+    ) -> ValueIterator<impl Iterator<Item = (u64, &[u8; CHUNK_SIZE])>, CHUNK_SIZE> {
         ValueIterator::new(
-            self.nodes()
+            self.nodes::<CHUNK_SIZE>()
                 .zip(self.value_mask.iter())
                 .filter_map(|(node, is_value)| if *is_value { Some(node) } else { None }),
         )
@@ -77,30 +87,30 @@ impl Multiproof {
     ///
     /// Note this is a linear search, so it's not efficient for large proofs.
     /// If there are a lot of values and you want to use them all it is much more efficient to use the iterator instead
-    pub fn get(&self, gindex: u64) -> Option<&Node> {
-        self.values()
+    pub fn get<const CHUNK_SIZE: usize>(&self, gindex: u64) -> Option<&[u8; CHUNK_SIZE]> {
+        self.values::<CHUNK_SIZE>()
             .find(|(g, _)| *g == gindex)
             .map(|(_, node)| node)
     }
 }
 
 /// An iterator over the values in a multiproof along with their gindices
-pub struct ValueIterator<'a, I>
+pub struct ValueIterator<'a, I, const CHUNK_SIZE: usize>
 where
-    I: Iterator<Item = (u64, &'a Node)>,
+    I: Iterator<Item = (u64, &'a [u8; CHUNK_SIZE])>,
 {
     inner: I,
 }
 
-impl<'a, I> ValueIterator<'a, I>
+impl<'a, I, const CHUNK_SIZE: usize> ValueIterator<'a, I, CHUNK_SIZE>
 where
-    I: Iterator<Item = (u64, &'a Node)>,
+    I: Iterator<Item = (u64, &'a [u8; CHUNK_SIZE])>,
 {
     fn new(inner: I) -> Self {
         ValueIterator { inner }
     }
 
-    pub fn next_assert_gindex(&mut self, gindex: u64) -> Result<&'a Node> {
+    pub fn next_assert_gindex(&mut self, gindex: u64) -> Result<&'a [u8; CHUNK_SIZE]> {
         let (g, node) = self.inner.next().ok_or(Error::MissingValue)?;
         if g == gindex {
             Ok(node)
@@ -113,11 +123,11 @@ where
     }
 }
 
-impl<'a, I> Iterator for ValueIterator<'a, I>
+impl<'a, I, const CHUNK_SIZE: usize> Iterator for ValueIterator<'a, I, CHUNK_SIZE>
 where
-    I: Iterator<Item = (u64, &'a Node)>,
+    I: Iterator<Item = (u64, &'a [u8; CHUNK_SIZE])>,
 {
-    type Item = (u64, &'a Node);
+    type Item = (u64, &'a [u8; CHUNK_SIZE]);
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
@@ -163,13 +173,13 @@ impl<'a> Iterator for GIndexIterator<'a> {
     }
 }
 
-enum TreeNode<'a> {
-    Leaf(&'a Node),
-    Computed(Node),
+enum TreeNode<'a, const CHUNK_SIZE: usize> {
+    Leaf(&'a [u8]),
+    Computed([u8; CHUNK_SIZE]),
     Internal,
 }
 
-impl<'a> TreeNode<'a> {
+impl<'a, const CHUNK_SIZE: usize> TreeNode<'a, CHUNK_SIZE> {
     fn has_value(&self) -> bool {
         matches!(self, TreeNode::Leaf(_)) || matches!(self, TreeNode::Computed(_))
     }
@@ -181,17 +191,19 @@ impl<'a> TreeNode<'a> {
 
 /// Compute the root of a compact multi-proof given the nodes and descriptor
 /// This is the hot path so any optimizations belong here.
-fn calculate_compact_multi_merkle_root(
-    nodes: &[Node],
+fn calculate_compact_multi_merkle_root<'a, const CHUNK_SIZE: usize>(
+    data: &'a [u8],
     descriptor: &Descriptor,
     stack_depth_hint: usize,
-) -> Result<Node> {
+) -> Result<[u8; CHUNK_SIZE]> {
     let mut stack = Vec::with_capacity(stack_depth_hint);
     let mut node_index = 0;
     let mut hasher = Sha256::new();
     for bit in descriptor.iter() {
         if *bit {
-            stack.push(TreeNode::Leaf(&nodes[node_index]));
+            stack.push(TreeNode::Leaf(
+                &data[node_index * CHUNK_SIZE..(node_index + 1) * CHUNK_SIZE],
+            ));
             node_index += 1;
 
             // reduce any leaf pairs on the stack until we can progress no further
@@ -215,9 +227,9 @@ fn calculate_compact_multi_merkle_root(
                 }
 
                 stack.pop(); // pop the internal node and replace with the hashed children
-                stack.push(TreeNode::Computed(Node::from_slice(
-                    &hasher.finalize_reset(),
-                )));
+                stack.push(TreeNode::<CHUNK_SIZE>::Computed(
+                    hasher.finalize_reset().as_slice().try_into().unwrap(),
+                ));
             }
         } else {
             stack.push(TreeNode::Internal);
@@ -238,7 +250,7 @@ pub(crate) fn calculate_max_stack_depth(descriptor: &Descriptor) -> usize {
     let mut max_stack_depth = 0;
     for bit in descriptor.iter() {
         if *bit {
-            stack.push(TreeNode::Computed(Node::default()));
+            stack.push(TreeNode::Computed([0; 32]));
             while stack.len() > 2
                 && stack[stack.len() - 1].has_value()
                 && stack[stack.len() - 2].has_value()
@@ -247,7 +259,7 @@ pub(crate) fn calculate_max_stack_depth(descriptor: &Descriptor) -> usize {
                 stack.pop();
                 stack.pop();
                 stack.pop();
-                stack.push(TreeNode::Computed(Node::default()));
+                stack.push(TreeNode::Computed([0; 32]));
                 max_stack_depth = max_stack_depth.max(stack.len());
             }
         } else {
