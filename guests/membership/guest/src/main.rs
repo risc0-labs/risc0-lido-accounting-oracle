@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::usize;
+
 use bitvec::prelude::*;
 use gindices::presets::mainnet::beacon_state::{self as beacon_state_gindices};
 use gindices::presets::mainnet::historical_batch as historical_batch_gindices;
@@ -51,58 +53,64 @@ pub fn main() {
         ProofType::Initial => (0, BitVec::<u32, Lsb0>::new()),
         ProofType::Continuation {
             prior_max_validator_index,
-            ref prior_membership,
-            ..
-        } => (prior_max_validator_index + 1, prior_membership.clone()),
+            prior_membership,
+            cont_type,
+            prior_slot,
+            prior_state_root,
+        } => {
+            match cont_type {
+                SameSlot => {
+                    assert_eq!(state_root, prior_state_root);
+                }
+                ShortRange => {
+                    let stored_root = values
+                        .next_assert_gindex(beacon_state_gindices::state_roots(prior_slot))
+                        .unwrap();
+                    assert_eq!(stored_root, &prior_state_root);
+                }
+                LongRange {
+                    hist_summary_multiproof,
+                } => {
+                    let historical_summary_root =
+                        multiproof // using a get here for now but this does cause an extra iteration through the values :(
+                            .get(beacon_state_gindices::historical_summaries(
+                                prior_slot,
+                            ))
+                            .unwrap();
+                    hist_summary_multiproof
+                        .verify(&historical_summary_root)
+                        .expect("Failed to verify historical summary multiproof given the root in the current state");
+                    let stored_root = hist_summary_multiproof
+                        .get(historical_batch_gindices::state_roots(prior_slot))
+                        .unwrap();
+                    assert_eq!(stored_root, &prior_state_root);
+                }
+            }
+
+            // Verify the prior membership proof
+            let prior_proof_journal = Journal {
+                self_program_id,
+                state_root: prior_state_root,
+                max_validator_index: prior_max_validator_index,
+                membership: prior_membership,
+            };
+            env::verify(self_program_id, &to_vec(&prior_proof_journal).unwrap())
+                .expect("Failed to verify prior proof");
+
+            (
+                prior_max_validator_index + 1,
+                prior_proof_journal.membership,
+            )
+        }
     };
 
-    if let ProofType::Continuation {
-        prior_state_root,
-        prior_slot,
-        prior_max_validator_index,
-        prior_membership,
-        cont_type,
-    } = proof_type
-    {
-        match cont_type {
-            SameSlot => {
-                assert_eq!(state_root, prior_state_root);
-            }
-            ShortRange => {
-                let stored_root = values
-                    .next_assert_gindex(beacon_state_gindices::state_roots(prior_slot))
-                    .unwrap();
-                assert_eq!(stored_root, &prior_state_root);
-            }
-            LongRange {
-                hist_summary_multiproof,
-            } => {
-                let historical_summary_root =
-                    multiproof // using a get here for now but this does cause an extra iteration through the values :(
-                        .get(beacon_state_gindices::historical_summaries(
-                            prior_slot,
-                        ))
-                        .unwrap();
-                hist_summary_multiproof
-                    .verify(&historical_summary_root)
-                    .expect("Failed to verify historical summary multiproof given the root in the current state");
-                let stored_root = hist_summary_multiproof
-                    .get(historical_batch_gindices::state_roots(prior_slot))
-                    .unwrap();
-                assert_eq!(stored_root, &prior_state_root);
-            }
-        }
-
-        // Verify the prior membership proof
-        let prior_proof_journal = Journal {
-            self_program_id,
-            state_root: prior_state_root,
-            max_validator_index: prior_max_validator_index,
-            membership: prior_membership.clone(),
-        };
-        env::verify(self_program_id, &to_vec(&prior_proof_journal).unwrap())
-            .expect("Failed to verify prior proof");
-    }
+    // Reserve the capacity for the membership bitvector to save cycles reallocating
+    // and to save memory by not overallocating
+    membership.reserve(
+        (max_validator_index - start_validator_index)
+            .try_into()
+            .unwrap_or(usize::MAX),
+    );
 
     for validator_index in start_validator_index..=max_validator_index {
         let value = values
