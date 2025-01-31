@@ -39,7 +39,7 @@ pub struct MultiproofOwnedData {
 
 /// An abstraction around a SSZ merkle multi-proof
 ///
-/// This is deserializable and borrows its data so supports zero-copy deserialization.
+/// This is deserializable and borrows its data to supports zero-copy deserialization.
 ///
 /// The most efficient way to consume a multiproof is via its IntoIterator implementation.
 /// It will iterate over (gindex, value) tuples for all gindices added when building.
