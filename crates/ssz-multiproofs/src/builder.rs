@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::multiproof::calculate_max_stack_depth;
-use crate::{Descriptor, Multiproof, Result};
+use crate::multiproof::{calculate_max_stack_depth, MultiproofOwnedData};
+use crate::{Descriptor, Result};
 #[cfg(feature = "progress-bar")]
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
@@ -73,7 +73,7 @@ impl MultiproofBuilder {
 
     /// Build the multi-proof for a given container
     #[tracing::instrument(skip(self, container))]
-    pub fn build<T: Prove + Sync>(self, container: &T) -> Result<Multiproof> {
+    pub fn build<T: Prove + Sync>(self, container: &T) -> Result<MultiproofOwnedData> {
         let gindices = self.gindices.into_iter().collect::<Vec<_>>();
 
         let proof_indices = compute_proof_indices(&gindices);
@@ -125,8 +125,14 @@ impl MultiproofBuilder {
         let descriptor = compute_proof_descriptor(&gindices)?;
         let max_stack_depth = calculate_max_stack_depth(&descriptor);
 
-        Ok(Multiproof {
-            nodes,
+        let data: Vec<u8> = nodes
+            .iter()
+            .flat_map(|node| node.as_slice())
+            .copied()
+            .collect();
+
+        Ok(MultiproofOwnedData {
+            data,
             descriptor,
             value_mask: value_mask.iter().collect(),
             max_stack_depth,

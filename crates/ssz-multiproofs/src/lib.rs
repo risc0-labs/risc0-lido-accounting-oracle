@@ -25,6 +25,6 @@ use bitvec::prelude::*;
 #[cfg(feature = "builder")]
 pub use builder::MultiproofBuilder;
 pub use error::{Error, Result};
-pub use multiproof::{Multiproof, ValueIterator};
+pub use multiproof::{Multiproof, MultiproofOwnedData, ValueIterator};
 
 pub(crate) type Descriptor = BitVec<u32, Lsb0>;
