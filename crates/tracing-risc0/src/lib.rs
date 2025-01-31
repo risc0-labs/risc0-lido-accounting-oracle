@@ -1,4 +1,6 @@
+#![cfg(target_os = "zkvm")]
 use risc0_zkvm::guest::env;
+use risc0_zkvm_platform::heap::{free, used};
 use tracing::{Event, Subscriber};
 use tracing_subscriber::fmt::format::{FormatEvent, FormatFields};
 use tracing_subscriber::fmt::{self, format::Writer};
@@ -18,7 +20,13 @@ where
         event: &Event<'_>,
     ) -> std::fmt::Result {
         // Write the custom field
-        write!(writer, "R0VM[cycles={}]", env::cycle_count())?;
+        write!(
+            writer,
+            "R0VM[cycles={} mem=used:{}, free:{}]",
+            env::cycle_count(),
+            used(),
+            free(),
+        )?;
 
         // Use the default formatter to format the rest of the event
         fmt::format()
