@@ -336,10 +336,12 @@ async fn build_membership_proof(
     let env = if let Some(prior_proof) = prior_proof {
         env_builder
             .add_assumption(prior_proof.receipt)
-            .write(&input)?
+            .write_frame(&bincode::serialize(&input)?)
             .build()?
     } else {
-        env_builder.write(&input)?.build()?
+        env_builder
+            .write_frame(&bincode::serialize(&input)?)
+            .build()?
     };
 
     let session_info = default_prover().prove_with_ctx(
@@ -384,7 +386,7 @@ async fn build_aggregate_proof(
 ) -> Result<AggregateProof> {
     let env = ExecutorEnv::builder()
         .add_assumption(membership_proof.receipt)
-        .write(&input)?
+        .write_frame(&bincode::serialize(&input)?)
         .build()?;
 
     let session_info = default_prover().prove_with_ctx(
