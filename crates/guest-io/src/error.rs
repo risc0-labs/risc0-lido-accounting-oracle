@@ -29,6 +29,9 @@ pub enum Error {
 
     #[error("Historical batch not provided but it is required for proving states are linked over the number of slots they span")]
     MissingHistoricalBatch,
+
+    #[error("Internal serde failed: {0}")]
+    Risc0Serde(#[from] risc0_zkvm::serde::Error),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

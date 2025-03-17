@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::borrow::Cow;
+
 use bitvec::prelude::*;
 use sha2::{Digest, Sha256};
 
@@ -22,20 +24,20 @@ use crate::Descriptor;
 ///
 /// This is serializable and  intended to be passed to the ZKVM for verification.
 ///
-#[derive(Debug, PartialEq, Default, serde::Serialize, serde::Deserialize)]
-pub struct MultiproofOwnedData {
-    /// The merkle tree nodes corresponding to both leaves and internal proof nodes
-    pub(crate) data: Vec<u8>,
+// #[derive(Debug, PartialEq, Default, serde::Serialize, serde::Deserialize)]
+// pub struct MultiproofOwnedData {
+//     /// The merkle tree nodes corresponding to both leaves and internal proof nodes
+//     pub(crate) data: Vec<u8>,
 
-    /// mask indicating which nodes are values (1) or proof supporting nodes (0)
-    pub(crate) value_mask: BitVec<u32, Lsb0>,
+//     /// mask indicating which nodes are values (1) or proof supporting nodes (0)
+//     pub(crate) value_mask: BitVec<u32, Lsb0>,
 
-    /// bitvector describing the shape of the proof. See https://github.com/ethereum/consensus-specs/pull/3148
-    pub(crate) descriptor: Descriptor,
+//     /// bitvector describing the shape of the proof. See https://github.com/ethereum/consensus-specs/pull/3148
+//     pub(crate) descriptor: Descriptor,
 
-    /// hint for the depth of the stack needed to verify this proof, useful for preallocation and computing this can be done outside the ZKVM
-    pub(crate) max_stack_depth: usize,
-}
+//     /// hint for the depth of the stack needed to verify this proof, useful for preallocation and computing this can be done outside the ZKVM
+//     pub(crate) max_stack_depth: usize,
+// }
 
 /// An abstraction around a SSZ merkle multi-proof
 ///
@@ -46,10 +48,10 @@ pub struct MultiproofOwnedData {
 /// Note this will iterate over the values/gindices in depth-first left-to-right order as they appear in the SSZ merkle tree.
 /// This will NOT be the order they were added or increasing order of gindex, it will depend on the shape of the data structure.
 ///
-#[derive(Debug, PartialEq, Default, serde::Deserialize)]
+#[derive(Debug, PartialEq, Default, serde::Deserialize, serde::Serialize)]
 pub struct Multiproof<'a> {
     /// The merkle tree nodes corresponding to both leaves and internal proof nodes
-    pub(crate) data: &'a [u8],
+    pub(crate) data: Cow<'a, [u8]>,
 
     /// mask indicating which nodes are values (1) or proof supporting nodes (0)
     pub(crate) value_mask: BitVec<u32, Lsb0>,

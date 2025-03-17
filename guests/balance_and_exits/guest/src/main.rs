@@ -21,7 +21,7 @@ use gindices::presets::mainnet::beacon_state as beacon_state_gindices;
 use guest_io::balance_and_exits::Input;
 use guest_io::validator_membership::Journal as MembershipJounal;
 use membership_builder::VALIDATOR_MEMBERSHIP_ID;
-use risc0_zkvm::{guest::env, serde};
+use risc0_zkvm::guest::env;
 use ssz_multiproofs::ValueIterator;
 use tracing_risc0::Risc0Formatter;
 use tracing_subscriber::fmt::format::FmtSpan;
@@ -39,6 +39,7 @@ pub fn main() {
     let input_bytes = env::read_frame();
 
     let Input {
+        membership_receipt,
         block_root,
         membership,
         block_multiproof,
@@ -69,8 +70,10 @@ pub fn main() {
         membership: membership,
         max_validator_index: validator_count - 1,
     };
-    env::verify(VALIDATOR_MEMBERSHIP_ID, &serde::to_vec(&j).unwrap())
-        .expect("Failed to verify membership bitvec");
+    assert_eq!(membership_receipt.journal.bytes, j.to_bytes().unwrap());
+    membership_receipt
+        .verify(VALIDATOR_MEMBERSHIP_ID)
+        .expect("Failed to verify membership receipt");
 
     let cl_balance = accumulate_balances(&mut values, &j.membership);
 

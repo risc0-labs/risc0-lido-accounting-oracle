@@ -2389,6 +2389,7 @@ version = "0.1.0"
 dependencies = [
  "alloy-primitives 0.7.7",
  "bitvec",
+ "bytemuck",
  "ethereum-consensus",
  "gindices",
  "risc0-zkvm",

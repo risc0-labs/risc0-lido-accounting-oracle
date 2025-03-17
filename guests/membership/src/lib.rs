@@ -19,7 +19,7 @@ include!(concat!(env!("OUT_DIR"), "/methods.rs"));
 mod tests {
     use gindices::presets::mainnet::beacon_state::{CAPELLA_FORK_SLOT, SLOTS_PER_HISTORICAL_ROOT};
     use guest_io::validator_membership;
-    use risc0_zkvm::{default_executor, ExecutorEnv, ExitCode};
+    use risc0_zkvm::{default_executor, default_prover, ExecutorEnv, ExitCode};
     use test_utils::TestStateBuilder;
 
     #[test]
@@ -68,9 +68,11 @@ mod tests {
         let env = ExecutorEnv::builder()
             .write_frame(&bincode::serialize(&input).unwrap())
             .build()?;
-        let session_info = default_executor().execute(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
+        let prove_info = default_prover().prove(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
+        prove_info.receipt.verify(super::VALIDATOR_MEMBERSHIP_ID)?;
 
         let input = validator_membership::Input::build_continuation(
+            &prove_info.receipt,
             &s1,
             500,
             &s1,
@@ -79,7 +81,6 @@ mod tests {
             super::VALIDATOR_MEMBERSHIP_ID,
         )?;
         let env = ExecutorEnv::builder()
-            .add_assumption(session_info.receipt_claim.unwrap())
             .write_frame(&bincode::serialize(&input).unwrap())
             .build()?;
         let session_info = default_executor().execute(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
@@ -108,9 +109,10 @@ mod tests {
         let env = ExecutorEnv::builder()
             .write_frame(&bincode::serialize(&input).unwrap())
             .build()?;
-        let session_info = default_executor().execute(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
+        let prove_info = default_prover().prove(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
 
         let input = validator_membership::Input::build_continuation(
+            &prove_info.receipt,
             &s1.clone(),
             500,
             &s2,
@@ -119,7 +121,6 @@ mod tests {
             super::VALIDATOR_MEMBERSHIP_ID,
         )?;
         let env = ExecutorEnv::builder()
-            .add_assumption(session_info.receipt_claim.unwrap())
             .write_frame(&bincode::serialize(&input).unwrap())
             .build()?;
 
@@ -147,9 +148,10 @@ mod tests {
         let env = ExecutorEnv::builder()
             .write_frame(&bincode::serialize(&input).unwrap())
             .build()?;
-        let session_info = default_executor().execute(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
+        let prove_info = default_prover().prove(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
 
         let input = validator_membership::Input::build_continuation(
+            &prove_info.receipt,
             &s1,
             500,
             &s2,
@@ -158,7 +160,6 @@ mod tests {
             super::VALIDATOR_MEMBERSHIP_ID,
         )?;
         let env = ExecutorEnv::builder()
-            .add_assumption(session_info.receipt_claim.unwrap())
             .write_frame(&bincode::serialize(&input).unwrap())
             .build()?;
 
