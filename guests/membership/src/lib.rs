@@ -18,13 +18,13 @@ include!(concat!(env!("OUT_DIR"), "/methods.rs"));
 #[cfg(test)]
 mod tests {
     use gindices::presets::mainnet::beacon_state::{CAPELLA_FORK_SLOT, SLOTS_PER_HISTORICAL_ROOT};
-    use guest_io::validator_membership;
+    use guest_io::{validator_membership, InputWithReceipt};
     use risc0_zkvm::{default_executor, default_prover, ExecutorEnv, ExitCode};
     use test_utils::TestStateBuilder;
 
     #[test]
     fn test_initial_proof() -> anyhow::Result<()> {
-        let n_validators = 1001;
+        let n_validators = 11;
         let n_lido_validators = 10;
         let max_validator_index = n_validators + n_lido_validators - 1;
 
@@ -34,10 +34,11 @@ mod tests {
         let s = b.build();
 
         let input = validator_membership::Input::build_initial(
-            &s,
+            s,
             max_validator_index as u64,
             super::VALIDATOR_MEMBERSHIP_ID,
         )?;
+        let input = InputWithReceipt::new_without_receipt(input);
         let input_bytes = bincode::serialize(&input).unwrap();
         println!("input length: {}", input_bytes.len());
         let env = ExecutorEnv::builder().write_frame(&input_bytes).build()?;
@@ -56,15 +57,19 @@ mod tests {
 
     #[test]
     fn test_continuation_same_slot() -> anyhow::Result<()> {
-        let n_validators = 1001;
+        let n_validators = 11;
         let max_validator_index = n_validators - 1;
 
         let mut b = TestStateBuilder::new(CAPELLA_FORK_SLOT);
         b.with_validators(n_validators);
         let s1 = b.build();
 
-        let input =
-            validator_membership::Input::build_initial(&s1, 500, super::VALIDATOR_MEMBERSHIP_ID)?;
+        let input = validator_membership::Input::build_initial(
+            s1.clone(),
+            5,
+            super::VALIDATOR_MEMBERSHIP_ID,
+        )?;
+        let input = InputWithReceipt::new_without_receipt(input);
         let env = ExecutorEnv::builder()
             .write_frame(&bincode::serialize(&input).unwrap())
             .build()?;
@@ -72,14 +77,14 @@ mod tests {
         prove_info.receipt.verify(super::VALIDATOR_MEMBERSHIP_ID)?;
 
         let input = validator_membership::Input::build_continuation(
-            &prove_info.receipt,
             &s1,
-            500,
+            5,
             &s1,
             max_validator_index as u64,
-            &None,
+            None,
             super::VALIDATOR_MEMBERSHIP_ID,
         )?;
+        let input = InputWithReceipt::new(input, prove_info.receipt);
         let env = ExecutorEnv::builder()
             .write_frame(&bincode::serialize(&input).unwrap())
             .build()?;
@@ -92,7 +97,7 @@ mod tests {
 
     #[test]
     fn test_continuation_short_range() -> anyhow::Result<()> {
-        let n_validators = 1001;
+        let n_validators = 11;
         let max_validator_index = n_validators - 1;
 
         let mut b = TestStateBuilder::new(CAPELLA_FORK_SLOT);
@@ -104,22 +109,28 @@ mod tests {
         b.with_prior_state(&s1);
         let s2 = b.build();
 
-        let input =
-            validator_membership::Input::build_initial(&s1, 500, super::VALIDATOR_MEMBERSHIP_ID)?;
+        let input = validator_membership::Input::build_initial(
+            s1.clone(),
+            5,
+            super::VALIDATOR_MEMBERSHIP_ID,
+        )?;
+        let input = InputWithReceipt::new_without_receipt(input);
+
         let env = ExecutorEnv::builder()
             .write_frame(&bincode::serialize(&input).unwrap())
             .build()?;
         let prove_info = default_prover().prove(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
 
         let input = validator_membership::Input::build_continuation(
-            &prove_info.receipt,
-            &s1.clone(),
-            500,
+            &s1,
+            5,
             &s2,
             max_validator_index as u64,
-            &None,
+            None,
             super::VALIDATOR_MEMBERSHIP_ID,
         )?;
+        let input = InputWithReceipt::new(input, prove_info.receipt);
+
         let env = ExecutorEnv::builder()
             .write_frame(&bincode::serialize(&input).unwrap())
             .build()?;
@@ -131,7 +142,7 @@ mod tests {
 
     #[test]
     fn test_continuation_long_range() -> anyhow::Result<()> {
-        let n_validators = 1001;
+        let n_validators = 11;
         let max_validator_index = n_validators - 1;
 
         let mut b = TestStateBuilder::new(CAPELLA_FORK_SLOT);
@@ -143,22 +154,28 @@ mod tests {
         let hist_batch = b.with_prior_state(&s1);
         let s2 = b.build();
 
-        let input =
-            validator_membership::Input::build_initial(&s1, 500, super::VALIDATOR_MEMBERSHIP_ID)?;
+        let input = validator_membership::Input::build_initial(
+            s1.clone(),
+            5,
+            super::VALIDATOR_MEMBERSHIP_ID,
+        )?;
+        let input = InputWithReceipt::new_without_receipt(input);
+
         let env = ExecutorEnv::builder()
             .write_frame(&bincode::serialize(&input).unwrap())
             .build()?;
         let prove_info = default_prover().prove(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
 
         let input = validator_membership::Input::build_continuation(
-            &prove_info.receipt,
             &s1,
-            500,
+            5,
             &s2,
             max_validator_index as u64,
-            &hist_batch,
+            hist_batch,
             super::VALIDATOR_MEMBERSHIP_ID,
         )?;
+        let input = InputWithReceipt::new(input, prove_info.receipt);
+
         let env = ExecutorEnv::builder()
             .write_frame(&bincode::serialize(&input).unwrap())
             .build()?;

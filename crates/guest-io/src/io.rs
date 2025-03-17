@@ -36,6 +36,22 @@ pub struct InputWithReceipt<T> {
     pub receipt: Option<Receipt>,
 }
 
+impl<T> InputWithReceipt<T> {
+    pub fn new(input: T, receipt: Receipt) -> Self {
+        Self {
+            input,
+            receipt: Some(receipt),
+        }
+    }
+
+    pub fn new_without_receipt(input: T) -> Self {
+        Self {
+            input,
+            receipt: None,
+        }
+    }
+}
+
 pub mod validator_membership {
 
     use risc0_zkvm::serde::to_vec;

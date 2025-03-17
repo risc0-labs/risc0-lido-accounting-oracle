@@ -212,8 +212,8 @@ impl<'a, const CHUNK_SIZE: usize> TreeNode<'a, CHUNK_SIZE> {
 
 /// Compute the root of a compact multi-proof given the nodes and descriptor
 /// This is the hot path so any optimizations belong here.
-fn calculate_compact_multi_merkle_root<'a, const CHUNK_SIZE: usize>(
-    data: &'a [u8],
+fn calculate_compact_multi_merkle_root<const CHUNK_SIZE: usize>(
+    data: &[u8],
     descriptor: &Descriptor,
     stack_depth_hint: usize,
 ) -> Result<[u8; CHUNK_SIZE]> {

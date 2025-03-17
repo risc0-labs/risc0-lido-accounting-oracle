@@ -20,6 +20,7 @@ use gindices::presets::mainnet::beacon_block as beacon_block_gindices;
 use gindices::presets::mainnet::beacon_state as beacon_state_gindices;
 use guest_io::balance_and_exits::Input;
 use guest_io::validator_membership::Journal as MembershipJounal;
+use guest_io::InputWithReceipt;
 use membership_builder::VALIDATOR_MEMBERSHIP_ID;
 use risc0_zkvm::guest::env;
 use ssz_multiproofs::ValueIterator;
@@ -38,11 +39,15 @@ pub fn main() {
 
     let input_bytes = env::read_frame();
 
-    let Input {
-        block_root,
-        membership,
-        block_multiproof,
-        state_multiproof: multiproof,
+    let InputWithReceipt {
+        input:
+            Input {
+                block_root,
+                membership,
+                block_multiproof,
+                state_multiproof: multiproof,
+            },
+        receipt: membership_receipt,
     } = deserialize(&input_bytes).expect("Failed to deserialize input");
 
     block_multiproof
@@ -69,10 +74,11 @@ pub fn main() {
         membership: membership,
         max_validator_index: validator_count - 1,
     };
-    // assert_eq!(membership_receipt.journal.bytes, j.to_bytes().unwrap());
-    // membership_receipt
-    //     .verify(VALIDATOR_MEMBERSHIP_ID)
-    //     .expect("Failed to verify membership receipt");
+    let membership_receipt = membership_receipt.expect("Missing membership receipt");
+    assert_eq!(membership_receipt.journal.bytes, j.to_bytes().unwrap());
+    membership_receipt
+        .verify(VALIDATOR_MEMBERSHIP_ID)
+        .expect("Failed to verify membership receipt");
 
     let cl_balance = accumulate_balances(&mut values, &j.membership);
 

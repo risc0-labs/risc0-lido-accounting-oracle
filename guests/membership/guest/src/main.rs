@@ -22,7 +22,7 @@ use guest_io::validator_membership::{
     ContinuationType::{LongRange, SameSlot, ShortRange},
     Input, Journal, ProofType,
 };
-use guest_io::WITHDRAWAL_CREDENTIALS;
+use guest_io::{InputWithReceipt, WITHDRAWAL_CREDENTIALS};
 use tracing_risc0::Risc0Formatter;
 use tracing_subscriber::fmt::format::FmtSpan;
 
@@ -38,13 +38,17 @@ pub fn main() {
 
     let input_bytes = env::read_frame();
 
-    let Input {
-        multiproof,
-        state_root,
-        proof_type,
-        self_program_id,
-        max_validator_index,
-        hist_summary_multiproof,
+    let InputWithReceipt {
+        input:
+            Input {
+                multiproof,
+                state_root,
+                proof_type,
+                self_program_id,
+                max_validator_index,
+                hist_summary_multiproof,
+            },
+        receipt: prior_receipt,
     } = deserialize(&input_bytes).expect("Failed to deserialize input");
 
     // verify the multi-proof which verifies leaf values
@@ -91,7 +95,7 @@ pub fn main() {
                     assert_eq!(stored_root, &prior_state_root);
                 }
             }
-
+            let prior_receipt = prior_receipt.expect("Missing prior receipt for continuation");
             // ensure the values in the journal match
             let prior_proof_journal = Journal {
                 self_program_id,
@@ -99,14 +103,14 @@ pub fn main() {
                 max_validator_index: prior_max_validator_index,
                 membership: prior_membership,
             };
-            // assert_eq!(
-            //     prior_receipt.journal.bytes,
-            //     prior_proof_journal.to_bytes().unwrap()
-            // );
+            assert_eq!(
+                prior_receipt.journal.bytes,
+                prior_proof_journal.to_bytes().unwrap()
+            );
             // Verify the prior membership proof. TODO: Figure out how to skip this in dev mode
-            // prior_receipt
-            //     .verify(self_program_id)
-            //     .expect("Failed to verify prior receipt");
+            prior_receipt
+                .verify(self_program_id)
+                .expect("Failed to verify prior receipt");
 
             (
                 prior_max_validator_index + 1,

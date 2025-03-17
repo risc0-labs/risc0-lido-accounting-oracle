@@ -23,7 +23,7 @@ use balance_and_exits_builder::{BALANCE_AND_EXITS_ELF, BALANCE_AND_EXITS_ID};
 use beacon_client::BeaconClient;
 use clap::Parser;
 use ethereum_consensus::phase0::mainnet::{HistoricalBatch, SLOTS_PER_HISTORICAL_ROOT};
-use guest_io::WITHDRAWAL_CREDENTIALS;
+use guest_io::{InputWithReceipt, WITHDRAWAL_CREDENTIALS};
 use membership_builder::{VALIDATOR_MEMBERSHIP_ELF, VALIDATOR_MEMBERSHIP_ID};
 use risc0_ethereum_contracts::encode_seal;
 use risc0_zkvm::{default_prover, ExecutorEnv, ProverOpts, Receipt, VerifierContext};
@@ -336,16 +336,21 @@ async fn build_membership_proof<'a>(
 ) -> Result<MembershipProof> {
     let mut env_builder = ExecutorEnv::builder();
 
-    let env = if let Some(prior_proof) = prior_proof {
-        env_builder
-            .add_assumption(prior_proof.receipt)
-            .write_frame(&bincode::serialize(&input)?)
-            .build()?
+    let input = if let Some(prior_proof) = prior_proof {
+        InputWithReceipt {
+            input,
+            receipt: Some(prior_proof.receipt),
+        }
     } else {
-        env_builder
-            .write_frame(&bincode::serialize(&input)?)
-            .build()?
+        InputWithReceipt {
+            input,
+            receipt: None,
+        }
     };
+
+    let env = env_builder
+        .write_frame(&bincode::serialize(&input)?)
+        .build()?;
 
     let session_info = default_prover().prove_with_ctx(
         env,
@@ -355,7 +360,7 @@ async fn build_membership_proof<'a>(
     )?;
     tracing::info!("total cycles: {}", session_info.stats.total_cycles);
 
-    let proof = MembershipProof::new(slot, input.max_validator_index, session_info.receipt);
+    let proof = MembershipProof::new(slot, input.input.max_validator_index, session_info.receipt);
 
     Ok(proof)
 }
@@ -387,8 +392,12 @@ async fn build_aggregate_proof<'a>(
     membership_proof: MembershipProof,
     slot: u64,
 ) -> Result<AggregateProof> {
+    let input = InputWithReceipt {
+        input,
+        receipt: Some(membership_proof.receipt),
+    };
+
     let env = ExecutorEnv::builder()
-        .add_assumption(membership_proof.receipt)
         .write_frame(&bincode::serialize(&input)?)
         .build()?;
 
