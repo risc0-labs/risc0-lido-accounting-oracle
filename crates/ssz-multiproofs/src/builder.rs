@@ -74,7 +74,7 @@ impl MultiproofBuilder {
 
     /// Build the multi-proof for a given container
     #[tracing::instrument(skip(self, container))]
-    pub fn build<T: Prove + Sync>(self, container: &T) -> Result<Multiproof> {
+    pub fn build<T: Prove + Sync>(self, container: &T) -> Result<Multiproof<'static>> {
         let gindices = self.gindices.into_iter().collect::<Vec<_>>();
 
         let proof_indices = compute_proof_indices(&gindices);

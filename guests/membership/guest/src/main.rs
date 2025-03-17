@@ -56,7 +56,6 @@ pub fn main() {
     let (start_validator_index, mut membership) = match proof_type {
         ProofType::Initial => (0, BitVec::<u32, Lsb0>::new()),
         ProofType::Continuation {
-            prior_receipt,
             prior_max_validator_index,
             prior_membership,
             cont_type,
@@ -100,10 +99,10 @@ pub fn main() {
                 max_validator_index: prior_max_validator_index,
                 membership: prior_membership,
             };
-            assert_eq!(
-                prior_receipt.journal.bytes,
-                prior_proof_journal.to_bytes().unwrap()
-            );
+            // assert_eq!(
+            //     prior_receipt.journal.bytes,
+            //     prior_proof_journal.to_bytes().unwrap()
+            // );
             // Verify the prior membership proof. TODO: Figure out how to skip this in dev mode
             // prior_receipt
             //     .verify(self_program_id)

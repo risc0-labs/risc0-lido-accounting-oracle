@@ -15,7 +15,7 @@
 use crate::error::Result;
 use alloy_primitives::B256;
 use bitvec::prelude::*;
-use risc0_zkvm::sha::Digest;
+use risc0_zkvm::{sha::Digest, Receipt};
 use ssz_multiproofs::Multiproof;
 #[cfg(feature = "builder")]
 use {
@@ -30,13 +30,19 @@ use {
     ssz_rs::prelude::*,
 };
 
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct InputWithReceipt<T> {
+    pub input: T,
+    pub receipt: Option<Receipt>,
+}
+
 pub mod validator_membership {
 
-    use risc0_zkvm::{serde::to_vec, Receipt};
+    use risc0_zkvm::serde::to_vec;
 
     use super::*;
 
-    #[derive(Debug, serde::Deserialize)]
+    #[derive(Debug, serde::Serialize, serde::Deserialize)]
     pub struct Input<'a> {
         /// The Program ID of this program. Need to accept it as input rather than hard-code otherwise it creates a cyclic hash reference
         /// This MUST be written to the journal and checked by the verifier! See https://github.com/risc0/risc0-ethereum/blob/main/contracts/src/RiscZeroSetVerifier.sol#L114
@@ -63,7 +69,7 @@ pub mod validator_membership {
     impl<'a> Input<'a> {
         #[tracing::instrument(skip(beacon_state, max_validator_index, self_program_id))]
         pub fn build_initial<D: Into<Digest>>(
-            beacon_state: &'a BeaconState,
+            beacon_state: BeaconState,
             max_validator_index: u64,
             self_program_id: D,
         ) -> Result<Self> {
@@ -76,7 +82,7 @@ pub mod validator_membership {
                         .unwrap()
                 }));
 
-            let multiproof = build_with_versioned_state(proof_builder, beacon_state)?;
+            let multiproof = build_with_versioned_state(proof_builder, &beacon_state)?;
 
             Ok(Self {
                 self_program_id: self_program_id.into(),
@@ -96,12 +102,11 @@ pub mod validator_membership {
             self_program_id
         ))]
         pub fn build_continuation<D: Into<Digest>>(
-            prior_receipt: &Receipt,
             prior_beacon_state: &BeaconState,
             prior_max_validator_index: u64,
-            beacon_state: &'a BeaconState,
+            beacon_state: &BeaconState,
             max_validator_index: u64,
-            historical_batch: &'a Option<HistoricalBatch>,
+            historical_batch: Option<HistoricalBatch>,
             self_program_id: D,
         ) -> Result<Self> {
             let state_root = beacon_state.hash_tree_root()?;
@@ -137,7 +142,7 @@ pub mod validator_membership {
                 );
                 let hist_summary_multiproof = MultiproofBuilder::new()
                     .with_gindex(historical_batch_gindices::state_roots(prior_slot).try_into()?)
-                    .build(historical_batch)?;
+                    .build(&historical_batch)?;
                 (ContinuationType::LongRange, Some(hist_summary_multiproof))
             } else {
                 return Err(Error::MissingHistoricalBatch);
@@ -150,7 +155,6 @@ pub mod validator_membership {
                 state_root,
                 max_validator_index,
                 proof_type: ProofType::Continuation {
-                    prior_receipt: prior_receipt.clone(),
                     prior_state_root: prior_beacon_state.hash_tree_root()?,
                     prior_slot,
                     prior_max_validator_index,
@@ -167,7 +171,6 @@ pub mod validator_membership {
     pub enum ProofType {
         Initial,
         Continuation {
-            prior_receipt: Receipt,
             prior_state_root: B256,
             prior_slot: u64,
             prior_max_validator_index: u64,
@@ -214,13 +217,9 @@ pub mod validator_membership {
 
 pub mod balance_and_exits {
     use super::*;
-    use risc0_zkvm::Receipt;
 
     #[derive(Debug, serde::Serialize, serde::Deserialize)]
     pub struct Input<'a> {
-        /// Risc0 proof of the membership
-        pub membership_receipt: Receipt,
-
         /// Block that the proof is rooted in
         pub block_root: B256,
 
@@ -237,13 +236,9 @@ pub mod balance_and_exits {
     }
 
     #[cfg(feature = "builder")]
-    impl<'a> Input<'a> {
+    impl Input<'_> {
         #[tracing::instrument(skip(block_header, beacon_state))]
-        pub fn build(
-            membership_receipt: &Receipt,
-            block_header: &'a BeaconBlockHeader,
-            beacon_state: &'a BeaconState,
-        ) -> Result<Self> {
+        pub fn build(block_header: &BeaconBlockHeader, beacon_state: &BeaconState) -> Result<Self> {
             let block_root = block_header.hash_tree_root()?;
 
             let membership = beacon_state
@@ -278,7 +273,6 @@ pub mod balance_and_exits {
                 build_with_versioned_state(state_multiproof_builder, beacon_state)?;
 
             Ok(Self {
-                membership_receipt: membership_receipt.clone(),
                 block_root,
                 membership,
                 block_multiproof,
@@ -292,7 +286,7 @@ pub mod balance_and_exits {
 fn build_with_versioned_state(
     builder: MultiproofBuilder,
     beacon_state: &BeaconState,
-) -> Result<Multiproof> {
+) -> Result<Multiproof<'static>> {
     match beacon_state {
         BeaconState::Phase0(b) => Ok(builder.build(b)?),
         BeaconState::Altair(b) => Ok(builder.build(b)?),

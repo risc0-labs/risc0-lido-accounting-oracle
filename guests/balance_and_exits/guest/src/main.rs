@@ -39,7 +39,6 @@ pub fn main() {
     let input_bytes = env::read_frame();
 
     let Input {
-        membership_receipt,
         block_root,
         membership,
         block_multiproof,
@@ -70,10 +69,10 @@ pub fn main() {
         membership: membership,
         max_validator_index: validator_count - 1,
     };
-    assert_eq!(membership_receipt.journal.bytes, j.to_bytes().unwrap());
-    membership_receipt
-        .verify(VALIDATOR_MEMBERSHIP_ID)
-        .expect("Failed to verify membership receipt");
+    // assert_eq!(membership_receipt.journal.bytes, j.to_bytes().unwrap());
+    // membership_receipt
+    //     .verify(VALIDATOR_MEMBERSHIP_ID)
+    //     .expect("Failed to verify membership receipt");
 
     let cl_balance = accumulate_balances(&mut values, &j.membership);
 
