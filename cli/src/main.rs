@@ -234,14 +234,14 @@ async fn main() -> Result<()> {
             test_contract,
             proof_path,
         } => {
-            submit_aggregate_proof(
-                eth_wallet_private_key,
-                eth_rpc_url,
-                contract,
-                test_contract,
-                proof_path,
-            )
-            .await?
+            // submit_aggregate_proof(
+            //     eth_wallet_private_key,
+            //     eth_rpc_url,
+            //     contract,
+            //     test_contract,
+            //     proof_path,
+            // )
+            // .await?
         }
     }
 
@@ -406,54 +406,51 @@ async fn build_aggregate_proof<'a>(
     })
 }
 
-async fn submit_aggregate_proof(
-    eth_wallet_private_key: PrivateKeySigner,
-    eth_rpc_url: Url,
-    contract: Option<Address>,
-    test_contract: Option<Address>,
-    in_path: PathBuf,
-) -> Result<()> {
-    let wallet = EthereumWallet::from(eth_wallet_private_key);
-    let provider = ProviderBuilder::new()
-        .with_recommended_fillers()
-        .wallet(wallet)
-        .on_http(eth_rpc_url);
+// async fn submit_aggregate_proof(
+//     eth_wallet_private_key: PrivateKeySigner,
+//     eth_rpc_url: Url,
+//     contract: Option<Address>,
+//     test_contract: Option<Address>,
+//     in_path: PathBuf,
+// ) -> Result<()> {
+//     let wallet = EthereumWallet::from(eth_wallet_private_key);
+//     let provider = ProviderBuilder::new().wallet(wallet).on_http(eth_rpc_url);
 
-    let proof: AggregateProof = bincode::deserialize(&read(in_path)?)?;
-    tracing::info!("verifying locally for sanity check");
-    proof.receipt.verify(BALANCE_AND_EXITS_ID)?;
-    tracing::info!("Local verification passed :)");
+//     let proof: AggregateProof = bincode::deserialize(&read(in_path)?)?;
+//     tracing::info!("verifying locally for sanity check");
+//     proof.receipt.verify(BALANCE_AND_EXITS_ID)?;
+//     tracing::info!("Local verification passed :)");
 
-    let seal = encode_seal(&proof.receipt).context("encoding seal")?;
+//     let seal = encode_seal(&proof.receipt).context("encoding seal")?;
 
-    if let Some(test_contract) = test_contract {
-        let contract = ITestVerifier::new(test_contract, provider.clone());
-        let block_root = proof.receipt.journal.bytes[..32].try_into()?;
-        let report = TestReport::abi_decode(&proof.receipt.journal.bytes[32..], true)?;
-        let call_builder = contract.verify(block_root, report, seal.clone().into());
-        let pending_tx = call_builder.send().await?;
-        tracing::info!(
-            "test_verifier: Submitted proof with tx hash: {}",
-            pending_tx.tx_hash()
-        );
-        let tx_receipt = pending_tx.get_receipt().await?;
-        tracing::info!("Test_verifier: Tx included with receipt {:?}", tx_receipt);
-    }
+//     if let Some(test_contract) = test_contract {
+//         let contract = ITestVerifier::new(test_contract, provider.clone());
+//         let block_root = proof.receipt.journal.bytes[..32].try_into()?;
+//         let report = TestReport::abi_decode(&proof.receipt.journal.bytes[32..], true)?;
+//         let call_builder = contract.verify(block_root, report, seal.clone().into());
+//         let pending_tx = call_builder.send().await?;
+//         tracing::info!(
+//             "test_verifier: Submitted proof with tx hash: {}",
+//             pending_tx.tx_hash()
+//         );
+//         let tx_receipt = pending_tx.get_receipt().await?;
+//         tracing::info!("Test_verifier: Tx included with receipt {:?}", tx_receipt);
+//     }
 
-    if let Some(contract) = contract {
-        let contract = IOracleProofReceiver::new(contract, provider.clone());
-        // skip the first 32 bytes of the journal as that is the beacon block hash which is not part of the report
-        let report = Report::abi_decode(&proof.receipt.journal.bytes[32..], true)?;
-        let call_builder = contract.update(proof.slot.try_into()?, report, seal.clone().into());
-        let pending_tx = call_builder.send().await?;
-        tracing::info!("Submitted proof with tx hash: {}", pending_tx.tx_hash());
-        let tx_receipt = pending_tx.get_receipt().await?;
-        tracing::info!("Tx included with receipt {:?}", tx_receipt);
-    }
+//     if let Some(contract) = contract {
+//         let contract = IOracleProofReceiver::new(contract, provider.clone());
+//         // skip the first 32 bytes of the journal as that is the beacon block hash which is not part of the report
+//         let report = Report::abi_decode(&proof.receipt.journal.bytes[32..], true)?;
+//         let call_builder = contract.update(proof.slot.try_into()?, report, seal.clone().into());
+//         let pending_tx = call_builder.send().await?;
+//         tracing::info!("Submitted proof with tx hash: {}", pending_tx.tx_hash());
+//         let tx_receipt = pending_tx.get_receipt().await?;
+//         tracing::info!("Tx included with receipt {:?}", tx_receipt);
+//     }
 
-    if let (None, None) = (contract, test_contract) {
-        eprintln!("No contract address provided, skipping submission");
-    }
+//     if let (None, None) = (contract, test_contract) {
+//         eprintln!("No contract address provided, skipping submission");
+//     }
 
-    Ok(())
-}
+//     Ok(())
+// }
