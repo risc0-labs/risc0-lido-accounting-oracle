@@ -193,7 +193,8 @@ async fn main() -> Result<()> {
             command: ProveCommand::Initial,
             input_path,
         } => {
-            let input = bincode::deserialize(&read(input_path)?)?;
+            let input_data = read(input_path)?;
+            let input = bincode::deserialize(&input_data)?;
             let proof =
                 build_membership_proof(input, None, args.slot, args.max_validator_index).await?;
             write(out_path, &bincode::serialize(&proof)?)?;
@@ -203,7 +204,8 @@ async fn main() -> Result<()> {
             command: ProveCommand::ContinuationFrom { prior_path },
             input_path,
         } => {
-            let input = bincode::deserialize(&read(input_path)?)?;
+            let input_data = read(input_path)?;
+            let input = bincode::deserialize(&input_data)?;
             let prior_proof = Some(bincode::deserialize(&read(prior_path)?)?);
             let proof =
                 build_membership_proof(input, prior_proof, args.slot, args.max_validator_index)
@@ -218,7 +220,8 @@ async fn main() -> Result<()> {
                 },
             input_path,
         } => {
-            let input = bincode::deserialize(&read(input_path)?)?;
+            let input_data = read(input_path)?;
+            let input = bincode::deserialize(&input_data)?;
             let membership_proof: MembershipProof =
                 bincode::deserialize(&read(membership_proof_path)?)?;
             let proof = build_aggregate_proof(input, membership_proof, args.slot).await?;
@@ -263,13 +266,13 @@ impl MembershipProof {
 }
 
 #[tracing::instrument(skip(beacon_rpc_url))]
-async fn build_membership_input(
+async fn build_membership_input<'a>(
     beacon_rpc_url: Url,
     slot: u64,
     max_validator_index: Option<u64>,
     prior_slot: Option<u64>,
     prior_max_validator_index: Option<u64>,
-) -> Result<guest_io::validator_membership::Input> {
+) -> Result<guest_io::validator_membership::Input<'a>> {
     use guest_io::validator_membership::Input;
 
     let beacon_client = BeaconClient::new_with_cache(beacon_rpc_url, "./beacon-cache")?;
@@ -315,34 +318,33 @@ async fn build_membership_input(
             prior_max_validator_index,
             &beacon_state,
             max_validator_index,
-            &hist_summary,
+            hist_summary,
             VALIDATOR_MEMBERSHIP_ID,
         )?
     } else {
-        Input::build_initial(&beacon_state, max_validator_index, VALIDATOR_MEMBERSHIP_ID)?
+        Input::build_initial(beacon_state, max_validator_index, VALIDATOR_MEMBERSHIP_ID)?
     };
     Ok(input)
 }
 
 #[tracing::instrument(skip(input, prior_proof))]
-async fn build_membership_proof(
-    input: guest_io::validator_membership::Input,
+async fn build_membership_proof<'a>(
+    input: guest_io::validator_membership::Input<'a>,
     prior_proof: Option<MembershipProof>,
     slot: u64,
     max_validator_index: Option<u64>,
 ) -> Result<MembershipProof> {
     let mut env_builder = ExecutorEnv::builder();
 
-    let env = if let Some(prior_proof) = prior_proof {
-        env_builder
-            .add_assumption(prior_proof.receipt)
-            .write_frame(&bincode::serialize(&input)?)
-            .build()?
+    let input = if let Some(prior_proof) = prior_proof {
+        input.with_receipt(prior_proof.receipt)
     } else {
-        env_builder
-            .write_frame(&bincode::serialize(&input)?)
-            .build()?
+        input.without_receipt()
     };
+
+    let env = env_builder
+        .write_frame(&bincode::serialize(&input)?)
+        .build()?;
 
     let session_info = default_prover().prove_with_ctx(
         env,
@@ -352,7 +354,7 @@ async fn build_membership_proof(
     )?;
     tracing::info!("total cycles: {}", session_info.stats.total_cycles);
 
-    let proof = MembershipProof::new(slot, input.max_validator_index, session_info.receipt);
+    let proof = MembershipProof::new(slot, input.input.max_validator_index, session_info.receipt);
 
     Ok(proof)
 }
@@ -364,10 +366,10 @@ struct AggregateProof {
 }
 
 #[tracing::instrument(skip(beacon_rpc_url))]
-async fn build_aggregate_input(
+async fn build_aggregate_input<'a>(
     beacon_rpc_url: Url,
     slot: u64,
-) -> Result<guest_io::balance_and_exits::Input> {
+) -> Result<guest_io::balance_and_exits::Input<'a>> {
     let beacon_client = BeaconClient::new_with_cache(beacon_rpc_url, "./beacon-cache")?;
     let beacon_block_header = beacon_client.get_block_header(slot).await?;
 
@@ -379,13 +381,14 @@ async fn build_aggregate_input(
 }
 
 #[tracing::instrument(skip(input, membership_proof))]
-async fn build_aggregate_proof(
-    input: guest_io::balance_and_exits::Input,
+async fn build_aggregate_proof<'a>(
+    input: guest_io::balance_and_exits::Input<'a>,
     membership_proof: MembershipProof,
     slot: u64,
 ) -> Result<AggregateProof> {
+    let input = input.with_receipt(membership_proof.receipt);
+
     let env = ExecutorEnv::builder()
-        .add_assumption(membership_proof.receipt)
         .write_frame(&bincode::serialize(&input)?)
         .build()?;
 

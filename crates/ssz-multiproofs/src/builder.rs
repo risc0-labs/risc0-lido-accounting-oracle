@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::multiproof::{calculate_max_stack_depth, MultiproofOwnedData};
+use crate::multiproof::{calculate_max_stack_depth, Multiproof};
 use crate::{Descriptor, Result};
 #[cfg(feature = "progress-bar")]
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use ssz_rs::prelude::{GeneralizedIndex, GeneralizedIndexable, Path, Prove};
 use ssz_rs::proofs::Prover;
+use std::borrow::Cow;
 use std::collections::BTreeSet;
 use std::collections::HashSet;
 
@@ -73,7 +74,7 @@ impl MultiproofBuilder {
 
     /// Build the multi-proof for a given container
     #[tracing::instrument(skip(self, container))]
-    pub fn build<T: Prove + Sync>(self, container: &T) -> Result<MultiproofOwnedData> {
+    pub fn build<T: Prove + Sync>(self, container: &T) -> Result<Multiproof<'static>> {
         let gindices = self.gindices.into_iter().collect::<Vec<_>>();
 
         let proof_indices = compute_proof_indices(&gindices);
@@ -131,8 +132,8 @@ impl MultiproofBuilder {
             .copied()
             .collect();
 
-        Ok(MultiproofOwnedData {
-            data,
+        Ok(Multiproof {
+            data: Cow::Owned(data),
             descriptor,
             value_mask: value_mask.iter().collect(),
             max_stack_depth,

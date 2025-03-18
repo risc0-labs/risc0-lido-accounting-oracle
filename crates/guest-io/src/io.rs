@@ -12,30 +12,37 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::error::Result;
 use alloy_primitives::B256;
 use bitvec::prelude::*;
-use risc0_zkvm::sha::Digest;
-#[cfg(not(feature = "builder"))]
+use risc0_zkvm::{sha::Digest, Receipt};
 use ssz_multiproofs::Multiproof;
 #[cfg(feature = "builder")]
 use {
-    crate::error::{Error, Result},
+    crate::error::Error,
     ethereum_consensus::phase0::{presets::mainnet::HistoricalBatch, BeaconBlockHeader},
     ethereum_consensus::types::mainnet::BeaconState,
     gindices::presets::mainnet::{
         beacon_block as beacon_block_gindices, beacon_state as beacon_state_gindices,
         beacon_state::SLOTS_PER_HISTORICAL_ROOT, historical_batch as historical_batch_gindices,
     },
-    ssz_multiproofs::{MultiproofBuilder, MultiproofOwnedData},
+    ssz_multiproofs::MultiproofBuilder,
     ssz_rs::prelude::*,
 };
 
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct InputWithReceipt<T> {
+    pub input: T,
+    pub receipt: Option<Receipt>,
+}
+
 pub mod validator_membership {
+
+    use risc0_zkvm::serde::to_vec;
 
     use super::*;
 
-    #[cfg(not(feature = "builder"))]
-    #[derive(Debug, serde::Deserialize)]
+    #[derive(Debug, serde::Serialize, serde::Deserialize)]
     pub struct Input<'a> {
         /// The Program ID of this program. Need to accept it as input rather than hard-code otherwise it creates a cyclic hash reference
         /// This MUST be written to the journal and checked by the verifier! See https://github.com/risc0/risc0-ethereum/blob/main/contracts/src/RiscZeroSetVerifier.sol#L114
@@ -59,33 +66,10 @@ pub mod validator_membership {
     }
 
     #[cfg(feature = "builder")]
-    #[derive(Debug, serde::Serialize, serde::Deserialize)]
-    pub struct Input {
-        /// The Program ID of this program. Need to accept it as input rather than hard-code otherwise it creates a cyclic hash reference
-        /// This MUST be written to the journal and checked by the verifier! See https://github.com/risc0/risc0-ethereum/blob/main/contracts/src/RiscZeroSetVerifier.sol#L114
-        pub self_program_id: Digest,
-
-        /// The state root of the state used in the current proof
-        pub state_root: B256,
-
-        /// the top validator index the membership proof will be extended to
-        pub max_validator_index: u64,
-
-        /// If this the first proof in the sequence, or a continuation that consumes an existing proof
-        pub proof_type: ProofType,
-
-        /// Merkle SSZ proof rooted in the beacon state
-        pub multiproof: MultiproofOwnedData,
-
-        /// Merkle SSZ proof rooted in an intermediate beacon state
-        pub hist_summary_multiproof: Option<MultiproofOwnedData>,
-    }
-
-    #[cfg(feature = "builder")]
-    impl Input {
+    impl<'a> Input<'a> {
         #[tracing::instrument(skip(beacon_state, max_validator_index, self_program_id))]
         pub fn build_initial<D: Into<Digest>>(
-            beacon_state: &BeaconState,
+            beacon_state: BeaconState,
             max_validator_index: u64,
             self_program_id: D,
         ) -> Result<Self> {
@@ -98,7 +82,7 @@ pub mod validator_membership {
                         .unwrap()
                 }));
 
-            let multiproof = build_with_versioned_state(proof_builder, beacon_state)?;
+            let multiproof = build_with_versioned_state(proof_builder, &beacon_state)?;
 
             Ok(Self {
                 self_program_id: self_program_id.into(),
@@ -122,7 +106,7 @@ pub mod validator_membership {
             prior_max_validator_index: u64,
             beacon_state: &BeaconState,
             max_validator_index: u64,
-            historical_batch: &Option<HistoricalBatch>,
+            historical_batch: Option<HistoricalBatch>,
             self_program_id: D,
         ) -> Result<Self> {
             let state_root = beacon_state.hash_tree_root()?;
@@ -158,7 +142,7 @@ pub mod validator_membership {
                 );
                 let hist_summary_multiproof = MultiproofBuilder::new()
                     .with_gindex(historical_batch_gindices::state_roots(prior_slot).try_into()?)
-                    .build(historical_batch)?;
+                    .build(&historical_batch)?;
                 (ContinuationType::LongRange, Some(hist_summary_multiproof))
             } else {
                 return Err(Error::MissingHistoricalBatch);
@@ -180,6 +164,20 @@ pub mod validator_membership {
                 multiproof,
                 hist_summary_multiproof,
             })
+        }
+
+        pub fn without_receipt(self) -> InputWithReceipt<Self> {
+            InputWithReceipt {
+                input: self,
+                receipt: None,
+            }
+        }
+
+        pub fn with_receipt(self, receipt: Receipt) -> InputWithReceipt<Self> {
+            InputWithReceipt {
+                input: self,
+                receipt: Some(receipt),
+            }
         }
     }
 
@@ -223,13 +221,18 @@ pub mod validator_membership {
         pub max_validator_index: u64,
         pub membership: BitVec<u32, Lsb0>,
     }
+
+    impl Journal {
+        pub fn to_bytes(&self) -> Result<Vec<u8>> {
+            Ok(bytemuck::cast_slice(&to_vec(self)?).to_vec())
+        }
+    }
 }
 
 pub mod balance_and_exits {
     use super::*;
 
-    #[cfg(not(feature = "builder"))]
-    #[derive(Debug, serde::Deserialize)]
+    #[derive(Debug, serde::Serialize, serde::Deserialize)]
     pub struct Input<'a> {
         /// Block that the proof is rooted in
         pub block_root: B256,
@@ -247,23 +250,7 @@ pub mod balance_and_exits {
     }
 
     #[cfg(feature = "builder")]
-    #[derive(Debug, serde::Serialize, serde::Deserialize)]
-    pub struct Input {
-        /// Block that the proof is rooted in
-        pub block_root: B256,
-
-        /// Bitfield indicating which validators are members of the Lido set
-        pub membership: BitVec<u32, Lsb0>,
-
-        /// Merkle SSZ proof rooted in the beacon block
-        pub block_multiproof: MultiproofOwnedData,
-
-        /// Merkle SSZ proof rooted in the beacon state
-        pub state_multiproof: MultiproofOwnedData,
-    }
-
-    #[cfg(feature = "builder")]
-    impl Input {
+    impl Input<'_> {
         #[tracing::instrument(skip(block_header, beacon_state))]
         pub fn build(block_header: &BeaconBlockHeader, beacon_state: &BeaconState) -> Result<Self> {
             let block_root = block_header.hash_tree_root()?;
@@ -306,6 +293,13 @@ pub mod balance_and_exits {
                 state_multiproof,
             })
         }
+
+        pub fn with_receipt(self, receipt: Receipt) -> InputWithReceipt<Self> {
+            InputWithReceipt {
+                input: self,
+                receipt: Some(receipt),
+            }
+        }
     }
 }
 
@@ -313,7 +307,7 @@ pub mod balance_and_exits {
 fn build_with_versioned_state(
     builder: MultiproofBuilder,
     beacon_state: &BeaconState,
-) -> Result<MultiproofOwnedData> {
+) -> Result<Multiproof<'static>> {
     match beacon_state {
         BeaconState::Phase0(b) => Ok(builder.build(b)?),
         BeaconState::Altair(b) => Ok(builder.build(b)?),
