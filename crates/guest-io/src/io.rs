@@ -36,22 +36,6 @@ pub struct InputWithReceipt<T> {
     pub receipt: Option<Receipt>,
 }
 
-impl<T> InputWithReceipt<T> {
-    pub fn new(input: T, receipt: Receipt) -> Self {
-        Self {
-            input,
-            receipt: Some(receipt),
-        }
-    }
-
-    pub fn new_without_receipt(input: T) -> Self {
-        Self {
-            input,
-            receipt: None,
-        }
-    }
-}
-
 pub mod validator_membership {
 
     use risc0_zkvm::serde::to_vec;
@@ -181,6 +165,20 @@ pub mod validator_membership {
                 hist_summary_multiproof,
             })
         }
+
+        pub fn without_receipt(self) -> InputWithReceipt<Self> {
+            InputWithReceipt {
+                input: self,
+                receipt: None,
+            }
+        }
+
+        pub fn with_receipt(self, receipt: Receipt) -> InputWithReceipt<Self> {
+            InputWithReceipt {
+                input: self,
+                receipt: Some(receipt),
+            }
+        }
     }
 
     #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -294,6 +292,13 @@ pub mod balance_and_exits {
                 block_multiproof,
                 state_multiproof,
             })
+        }
+
+        pub fn with_receipt(self, receipt: Receipt) -> InputWithReceipt<Self> {
+            InputWithReceipt {
+                input: self,
+                receipt: Some(receipt),
+            }
         }
     }
 }

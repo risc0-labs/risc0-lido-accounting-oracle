@@ -23,7 +23,7 @@ use balance_and_exits_builder::{BALANCE_AND_EXITS_ELF, BALANCE_AND_EXITS_ID};
 use beacon_client::BeaconClient;
 use clap::Parser;
 use ethereum_consensus::phase0::mainnet::{HistoricalBatch, SLOTS_PER_HISTORICAL_ROOT};
-use guest_io::{InputWithReceipt, WITHDRAWAL_CREDENTIALS};
+use guest_io::WITHDRAWAL_CREDENTIALS;
 use membership_builder::{VALIDATOR_MEMBERSHIP_ELF, VALIDATOR_MEMBERSHIP_ID};
 use risc0_ethereum_contracts::encode_seal;
 use risc0_zkvm::{default_prover, ExecutorEnv, ProverOpts, Receipt, VerifierContext};
@@ -337,15 +337,9 @@ async fn build_membership_proof<'a>(
     let mut env_builder = ExecutorEnv::builder();
 
     let input = if let Some(prior_proof) = prior_proof {
-        InputWithReceipt {
-            input,
-            receipt: Some(prior_proof.receipt),
-        }
+        input.with_receipt(prior_proof.receipt)
     } else {
-        InputWithReceipt {
-            input,
-            receipt: None,
-        }
+        input.without_receipt()
     };
 
     let env = env_builder
@@ -392,10 +386,7 @@ async fn build_aggregate_proof<'a>(
     membership_proof: MembershipProof,
     slot: u64,
 ) -> Result<AggregateProof> {
-    let input = InputWithReceipt {
-        input,
-        receipt: Some(membership_proof.receipt),
-    };
+    let input = input.with_receipt(membership_proof.receipt);
 
     let env = ExecutorEnv::builder()
         .write_frame(&bincode::serialize(&input)?)

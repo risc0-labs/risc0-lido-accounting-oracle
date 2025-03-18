@@ -18,7 +18,7 @@ include!(concat!(env!("OUT_DIR"), "/methods.rs"));
 #[cfg(test)]
 mod tests {
     use gindices::presets::mainnet::beacon_state::{CAPELLA_FORK_SLOT, SLOTS_PER_HISTORICAL_ROOT};
-    use guest_io::{validator_membership, InputWithReceipt};
+    use guest_io::validator_membership;
     use risc0_zkvm::{default_executor, default_prover, ExecutorEnv, ExitCode};
     use test_utils::TestStateBuilder;
 
@@ -37,8 +37,8 @@ mod tests {
             s,
             max_validator_index as u64,
             super::VALIDATOR_MEMBERSHIP_ID,
-        )?;
-        let input = InputWithReceipt::new_without_receipt(input);
+        )?
+        .without_receipt();
         let input_bytes = bincode::serialize(&input).unwrap();
         println!("input length: {}", input_bytes.len());
         let env = ExecutorEnv::builder().write_frame(&input_bytes).build()?;
@@ -68,8 +68,8 @@ mod tests {
             s1.clone(),
             5,
             super::VALIDATOR_MEMBERSHIP_ID,
-        )?;
-        let input = InputWithReceipt::new_without_receipt(input);
+        )?
+        .without_receipt();
         let env = ExecutorEnv::builder()
             .write_frame(&bincode::serialize(&input).unwrap())
             .build()?;
@@ -83,8 +83,8 @@ mod tests {
             max_validator_index as u64,
             None,
             super::VALIDATOR_MEMBERSHIP_ID,
-        )?;
-        let input = InputWithReceipt::new(input, prove_info.receipt);
+        )?
+        .with_receipt(prove_info.receipt);
         let env = ExecutorEnv::builder()
             .write_frame(&bincode::serialize(&input).unwrap())
             .build()?;
@@ -113,8 +113,8 @@ mod tests {
             s1.clone(),
             5,
             super::VALIDATOR_MEMBERSHIP_ID,
-        )?;
-        let input = InputWithReceipt::new_without_receipt(input);
+        )?
+        .without_receipt();
 
         let env = ExecutorEnv::builder()
             .write_frame(&bincode::serialize(&input).unwrap())
@@ -128,8 +128,8 @@ mod tests {
             max_validator_index as u64,
             None,
             super::VALIDATOR_MEMBERSHIP_ID,
-        )?;
-        let input = InputWithReceipt::new(input, prove_info.receipt);
+        )?
+        .with_receipt(prove_info.receipt);
 
         let env = ExecutorEnv::builder()
             .write_frame(&bincode::serialize(&input).unwrap())
@@ -158,8 +158,8 @@ mod tests {
             s1.clone(),
             5,
             super::VALIDATOR_MEMBERSHIP_ID,
-        )?;
-        let input = InputWithReceipt::new_without_receipt(input);
+        )?
+        .without_receipt();
 
         let env = ExecutorEnv::builder()
             .write_frame(&bincode::serialize(&input).unwrap())
@@ -173,8 +173,8 @@ mod tests {
             max_validator_index as u64,
             hist_batch,
             super::VALIDATOR_MEMBERSHIP_ID,
-        )?;
-        let input = InputWithReceipt::new(input, prove_info.receipt);
+        )?
+        .with_receipt(prove_info.receipt);
 
         let env = ExecutorEnv::builder()
             .write_frame(&bincode::serialize(&input).unwrap())

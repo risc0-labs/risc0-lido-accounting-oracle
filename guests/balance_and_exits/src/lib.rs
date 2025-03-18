@@ -20,7 +20,7 @@ mod tests {
     use ethereum_consensus::phase0::presets::mainnet::BeaconBlockHeader;
     use ethereum_consensus::ssz::prelude::*;
     use gindices::presets::mainnet::beacon_state::CAPELLA_FORK_SLOT;
-    use guest_io::{balance_and_exits, validator_membership, InputWithReceipt};
+    use guest_io::{balance_and_exits, validator_membership};
     use risc0_zkvm::{default_executor, default_prover, ExecutorEnv};
     use test_utils::TestStateBuilder;
 
@@ -44,16 +44,16 @@ mod tests {
             s.clone(),
             max_validator_index as u64,
             membership_builder::VALIDATOR_MEMBERSHIP_ID,
-        )?;
-        let input = InputWithReceipt::new_without_receipt(input);
+        )?
+        .without_receipt();
         let env = ExecutorEnv::builder()
             .write_frame(&bincode::serialize(&input).unwrap())
             .build()?;
         let membership_proof =
             default_prover().prove(env, membership_builder::VALIDATOR_MEMBERSHIP_ELF)?;
 
-        let input = balance_and_exits::Input::build(&block_header, &s.clone()).unwrap();
-        let input = InputWithReceipt::new(input, membership_proof.receipt);
+        let input = balance_and_exits::Input::build(&block_header, &s.clone())?
+            .with_receipt(membership_proof.receipt);
         let env = ExecutorEnv::builder()
             .write_frame(&bincode::serialize(&input).unwrap())
             .build()?;
