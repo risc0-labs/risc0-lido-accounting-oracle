@@ -99,6 +99,7 @@ pub fn main() {
     env::commit_slice(&withdrawal_vault_balance.abi_encode());
     env::commit_slice(&num_validators.abi_encode());
     env::commit_slice(&num_exited_validators.abi_encode());
+    env::commit_slice(&num_exited_validators.abi_encode());
 }
 
 fn get_slot<'a, I: Iterator<Item = (u64, &'a Node)>>(values: &mut ValueIterator<'a, I, 32>) -> u64 {

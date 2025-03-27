@@ -36,8 +36,24 @@ use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 use url::Url;
 
 alloy::sol!(
+    struct Report {
+        uint256 clBalanceGwei;
+        uint256 withdrawalVaultBalanceWei;
+        uint256 totalDepositedValidators;
+        uint256 totalExitedValidators;
+    }
+
+    struct Commitment {
+        uint256 id;
+        bytes32 digest;
+        bytes32 configID;
+    }
+
+    /// @title Receiver of oracle reports and proof data
     #[sol(rpc, all_derives)]
-    "../contracts/src/IOracleProofReceiver.sol"
+    interface IOracleProofReceiver {
+        function update(uint256 refSlot, Report calldata r, bytes calldata seal, Commitment calldata commitment) external;
+    }
 );
 
 alloy::sol!(
@@ -448,10 +464,7 @@ async fn submit_aggregate_proof(
     in_path: PathBuf,
 ) -> Result<()> {
     let wallet = EthereumWallet::from(eth_wallet_private_key);
-    let provider = ProviderBuilder::new()
-        .with_recommended_fillers()
-        .wallet(wallet)
-        .on_http(eth_rpc_url);
+    let provider = ProviderBuilder::new().wallet(wallet).on_http(eth_rpc_url);
 
     let proof: AggregateProof = bincode::deserialize(&read(in_path)?)?;
     tracing::info!("verifying locally for sanity check");
@@ -478,7 +491,13 @@ async fn submit_aggregate_proof(
         let contract = IOracleProofReceiver::new(contract, provider.clone());
         // skip the first 32 bytes of the journal as that is the beacon block hash which is not part of the report
         let report = Report::abi_decode(&proof.receipt.journal.bytes[32..], true)?;
-        let call_builder = contract.update(proof.slot.try_into()?, report, seal.clone().into());
+        let commitment = Commitment::abi_decode(&proof.receipt.journal.bytes[32 + 32..], true)?; // TODO: This is garbage
+        let call_builder = contract.update(
+            proof.slot.try_into()?,
+            report,
+            seal.clone().into(),
+            commitment,
+        );
         let pending_tx = call_builder.send().await?;
         tracing::info!("Submitted proof with tx hash: {}", pending_tx.tx_hash());
         let tx_receipt = pending_tx.get_receipt().await?;

@@ -14,6 +14,7 @@
 
 use crate::error::Result;
 use alloy_primitives::B256;
+use alloy_sol_types::sol;
 use bitvec::prelude::*;
 use risc0_steel::ethereum::EthEvmInput;
 use risc0_zkvm::{sha::Digest, Receipt};
@@ -231,6 +232,8 @@ pub mod validator_membership {
 }
 
 pub mod balance_and_exits {
+    use risc0_steel::Commitment;
+
     use super::*;
 
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -307,6 +310,17 @@ pub mod balance_and_exits {
                 input: self,
                 receipt: Some(receipt),
             }
+        }
+    }
+
+    sol! {
+        struct Journal {
+            bytes32 blockRoot;
+            uint256 clBalanceGwei;
+            uint256 withdrawalVaultBalanceWei;
+            uint256 totalDepositedValidators;
+            uint256 totalExitedValidators;
+            Commitment commitment;
         }
     }
 }
