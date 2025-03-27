@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use alloy_primitives::utils::Unit;
 use alloy_sol_types::SolValue;
 use bincode::deserialize;
 use bitvec::prelude::*;
@@ -20,8 +21,9 @@ use gindices::presets::mainnet::beacon_block as beacon_block_gindices;
 use gindices::presets::mainnet::beacon_state as beacon_state_gindices;
 use guest_io::balance_and_exits::Input;
 use guest_io::validator_membership::Journal as MembershipJounal;
-use guest_io::InputWithReceipt;
+use guest_io::{InputWithReceipt, WITHDRAWAL_CREDENTIALS};
 use membership_builder::VALIDATOR_MEMBERSHIP_ID;
+use risc0_steel::Account;
 use risc0_zkvm::guest::env;
 use ssz_multiproofs::ValueIterator;
 use tracing_risc0::Risc0Formatter;
@@ -46,6 +48,7 @@ pub fn main() {
                 membership,
                 block_multiproof,
                 state_multiproof: multiproof,
+                evm_input,
             },
         receipt: membership_receipt,
     } = deserialize(&input_bytes).expect("Failed to deserialize input");
@@ -82,7 +85,13 @@ pub fn main() {
 
     let cl_balance = accumulate_balances(&mut values, &j.membership);
 
-    let withdrawal_vault_balance: u64 = 0; // TODO: Calculate withdrawal vault balance using Steel
+    // obtain the withdrawal vault balance from the EVM input
+    let env = evm_input.into_env();
+    let withdrawal_address_bytes: [u8; 20] = WITHDRAWAL_CREDENTIALS.0[12..].try_into().unwrap();
+    let account = Account::new(withdrawal_address_bytes.into(), &env);
+    let withdrawal_vault_balance: u64 = (account.info().balance / Unit::GWEI.wei())
+        .try_into()
+        .expect("U64 max value exceeded by withdrawal vault balance in gwei");
 
     // write the outputs in ABI compatible format
     env::commit_slice(&block_root.abi_encode());

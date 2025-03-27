@@ -26,6 +26,7 @@ use ethereum_consensus::phase0::mainnet::{HistoricalBatch, SLOTS_PER_HISTORICAL_
 use guest_io::WITHDRAWAL_CREDENTIALS;
 use membership_builder::{VALIDATOR_MEMBERSHIP_ELF, VALIDATOR_MEMBERSHIP_ID};
 use risc0_ethereum_contracts::encode_seal;
+use risc0_steel::{ethereum::EthEvmEnv, Account};
 use risc0_zkvm::{default_prover, ExecutorEnv, ProverOpts, Receipt, VerifierContext};
 use std::{
     fs::{read, write},
@@ -123,7 +124,13 @@ enum BuildCommand {
         prior_max_validator_index: Option<u64>,
     },
     /// An aggregation (oracle) proof that can be submitted on-chain
-    Aggregation,
+    Aggregation {
+        #[clap(long, env)]
+        withdrawal_vault_address: Address,
+
+        #[clap(long, env)]
+        eth_rpc_url: Url,
+    },
 }
 
 #[derive(Parser, Debug)]
@@ -183,9 +190,19 @@ async fn main() -> Result<()> {
         Command::BuildInput {
             out_path,
             beacon_rpc_url,
-            command: BuildCommand::Aggregation { .. },
+            command:
+                BuildCommand::Aggregation {
+                    withdrawal_vault_address,
+                    eth_rpc_url,
+                },
         } => {
-            let input = build_aggregate_input(beacon_rpc_url, args.slot).await?;
+            let input = build_aggregate_input(
+                beacon_rpc_url,
+                args.slot,
+                withdrawal_vault_address,
+                eth_rpc_url,
+            )
+            .await?;
             write(out_path, &bincode::serialize(&input)?)?;
         }
         Command::Prove {
@@ -369,13 +386,30 @@ struct AggregateProof {
 async fn build_aggregate_input<'a>(
     beacon_rpc_url: Url,
     slot: u64,
+    withdrawal_vault_address: Address,
+    eth_rpc_url: Url,
 ) -> Result<guest_io::balance_and_exits::Input<'a>> {
-    let beacon_client = BeaconClient::new_with_cache(beacon_rpc_url, "./beacon-cache")?;
+    let beacon_client = BeaconClient::new_with_cache(beacon_rpc_url.clone(), "./beacon-cache")?;
     let beacon_block_header = beacon_client.get_block_header(slot).await?;
 
     let beacon_state = beacon_client.get_beacon_state(slot).await?;
-    let input =
-        guest_io::balance_and_exits::Input::build(&beacon_block_header.message, &beacon_state)?;
+
+    // Build the steel proof for the withdrawalVault balance
+    let mut env = EthEvmEnv::builder()
+        .rpc(eth_rpc_url)
+        .beacon_api(beacon_rpc_url)
+        .block_number(slot)
+        .build()
+        .await?;
+    let account = Account::preflight(withdrawal_vault_address, &mut env);
+    let _info = account.info().await?;
+    let evm_input = env.into_input().await?;
+
+    let input = guest_io::balance_and_exits::Input::build(
+        &beacon_block_header.message,
+        &beacon_state,
+        evm_input,
+    )?;
 
     Ok(input)
 }

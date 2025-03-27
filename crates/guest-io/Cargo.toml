@@ -12,6 +12,7 @@ sepolia = []
 [dependencies]
 ssz-multiproofs = { workspace = true }
 
+risc0-steel = { workspace = true }
 serde.workspace = true
 alloy-primitives.workspace = true
 risc0-zkvm.workspace = true
