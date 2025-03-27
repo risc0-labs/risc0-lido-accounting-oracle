@@ -14,16 +14,9 @@
 
 use std::{collections::HashMap, env};
 
-use risc0_build::{embed_methods_with_options, DockerOptions, GuestOptions};
+use risc0_build::{embed_methods_with_options, GuestOptionsBuilder};
 
 fn main() {
-    // Builds can be made deterministic, and thereby reproducible, by using Docker to build the
-    // guest. Check the RISC0_USE_DOCKER variable and use Docker to build the guest if set.
-    println!("cargo:rerun-if-env-changed=RISC0_USE_DOCKER");
-    let use_docker = env::var("RISC0_USE_DOCKER").ok().map(|_| DockerOptions {
-        root_dir: Some("../".into()),
-    });
-
     let guest_features = env::var("CARGO_FEATURE_SEPOLIA")
         .map(|_| vec!["sepolia".into()])
         .unwrap_or_default();
@@ -36,9 +29,9 @@ fn main() {
     // Generate Rust source files for the methods crate.
     embed_methods_with_options(HashMap::from([(
         "validator_membership",
-        GuestOptions {
-            features: guest_features,
-            use_docker: use_docker.clone(),
-        },
+        GuestOptionsBuilder::default()
+            .features(guest_features)
+            .build()
+            .unwrap(),
     )]));
 }

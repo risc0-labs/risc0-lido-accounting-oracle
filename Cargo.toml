@@ -24,11 +24,12 @@ bytemuck = { version = "1.14" }
 hex = { version = "0.4" }
 log = { version = "0.4" }
 methods = { path = "./methods" }
-risc0-build = { version = "1.2", features = ["docker"] }
-risc0-build-ethereum = { git = "https://github.com/risc0/risc0-ethereum", tag = "v1.2.0" }
-risc0-ethereum-contracts = { git = "https://github.com/risc0/risc0-ethereum", tag = "v1.2.0" }
-risc0-zkvm = { version = "1.2" }
-risc0-zkp = { version = "1.2" }
+risc0-build = { version = "2.0", features = ["docker"] }
+risc0-build-ethereum = { git = "https://github.com/risc0/risc0-ethereum", tag = "v2.0.0-rc.3" }
+risc0-ethereum-contracts = { git = "https://github.com/risc0/risc0-ethereum", tag = "v2.0.0-rc.3" }
+risc0-zkvm = { version = "2.0" }
+risc0-zkp = { version = "2.0" }
+risc0-zkvm-platform = { version = "2.0", default-features = false }
 
 ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus.git", rev = "8fbd8a53dca0170bedeca40a92ee70fd48c4615b", default-features = false, features = ["serde"] }
 ssz_rs = { git = "https://github.com/willemolding/ssz-rs", rev = "d351c06a1e47e7cfa2470c2571254bf44982064d"}
