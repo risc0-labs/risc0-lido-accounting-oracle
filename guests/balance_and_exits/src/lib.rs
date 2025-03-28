@@ -17,15 +17,34 @@ include!(concat!(env!("OUT_DIR"), "/methods.rs"));
 
 #[cfg(test)]
 mod tests {
+    use alloy_primitives::utils::parse_ether;
     use ethereum_consensus::phase0::presets::mainnet::BeaconBlockHeader;
     use ethereum_consensus::ssz::prelude::*;
     use gindices::presets::mainnet::beacon_state::CAPELLA_FORK_SLOT;
-    use guest_io::{balance_and_exits, validator_membership};
+    use guest_io::{balance_and_exits, validator_membership, WITHDRAWAL_VAULT_ADDRESS};
+    use revm::primitives::SpecId;
+    use risc0_steel::{config::ChainSpec, ethereum::EthEvmEnv, Account};
     use risc0_zkvm::{default_executor, default_prover, ExecutorEnv};
     use test_utils::TestStateBuilder;
 
-    #[test]
-    fn test_balance_and_exits() -> anyhow::Result<()> {
+    use alloy::providers::{ext::AnvilApi, Provider, ProviderBuilder};
+
+    /// Returns an Anvil provider the WITHDRAWAL_VAULT_ADDRESS balance set to 33 ether
+    async fn test_provider() -> impl Provider + Clone {
+        let provider = ProviderBuilder::new()
+            .on_anvil_with_wallet_and_config(|anvil| anvil.args(["--hardfork", "cancun"]))
+            .unwrap();
+
+        provider
+            .anvil_set_balance(WITHDRAWAL_VAULT_ADDRESS, parse_ether("33").unwrap())
+            .await
+            .unwrap();
+
+        provider
+    }
+
+    #[tokio::test]
+    async fn test_balance_and_exits() -> anyhow::Result<()> {
         let n_validators = 10;
         let n_lido_validators = 1;
         let max_validator_index = n_validators + n_lido_validators - 1;
@@ -52,7 +71,19 @@ mod tests {
         let membership_proof =
             default_prover().prove(env, membership_builder::VALIDATOR_MEMBERSHIP_ELF)?;
 
-        let input = balance_and_exits::Input::build(&block_header, &s.clone())?
+        // build the Steel input for reading the balance
+        let provider = test_provider().await;
+        let mut env = EthEvmEnv::builder()
+            .provider(provider.clone())
+            .build()
+            .await
+            .unwrap()
+            .with_chain_spec(&ChainSpec::new_single(31337, SpecId::CANCUN));
+        let account = Account::preflight(WITHDRAWAL_VAULT_ADDRESS, &mut env);
+        account.bytecode(true).info().await.unwrap();
+        let input = env.into_input().await.unwrap();
+
+        let input = balance_and_exits::Input::build(&block_header, &s.clone(), input)?
             .with_receipt(membership_proof.receipt);
         let env = ExecutorEnv::builder()
             .write_frame(&bincode::serialize(&input).unwrap())
