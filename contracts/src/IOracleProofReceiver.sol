@@ -27,5 +27,6 @@ struct Report {
 
 /// @title Receiver of oracle reports and proof data
 interface IOracleProofReceiver {
-    function update(uint256 refSlot, Report calldata r, bytes calldata seal, Steel.Commitment calldata commitment) external;
+    function update(uint256 refSlot, Report calldata r, bytes calldata seal, Steel.Commitment calldata commitment)
+        external;
 }

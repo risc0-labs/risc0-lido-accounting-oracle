@@ -33,7 +33,6 @@ contract SecondOpinionOracle is ISecondOpinionOracle, IOracleProofReceiver {
         Steel.Commitment commitment;
     }
 
-
     /// @notice RISC Zero verifier contract address.
     IRiscZeroVerifier public immutable verifier;
     uint256 public immutable genesis_block_timestamp;
@@ -54,7 +53,9 @@ contract SecondOpinionOracle is ISecondOpinionOracle, IOracleProofReceiver {
     }
 
     /// @notice Set an oracle report for a given slot by verifying the ZK proof
-    function update(uint256 refSlot, Report calldata r, bytes calldata seal, Steel.Commitment calldata commitment) external {
+    function update(uint256 refSlot, Report calldata r, bytes calldata seal, Steel.Commitment calldata commitment)
+        external
+    {
         require(Steel.validateCommitment(commitment), "Invalid commitment");
 
         Journal memory journal = Journal({
