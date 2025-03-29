@@ -23,9 +23,10 @@ use balance_and_exits_builder::{BALANCE_AND_EXITS_ELF, BALANCE_AND_EXITS_ID};
 use beacon_client::BeaconClient;
 use clap::Parser;
 use ethereum_consensus::phase0::mainnet::{HistoricalBatch, SLOTS_PER_HISTORICAL_ROOT};
-use guest_io::WITHDRAWAL_CREDENTIALS;
+use guest_io::{WITHDRAWAL_CREDENTIALS, WITHDRAWAL_VAULT_ADDRESS};
 use membership_builder::{VALIDATOR_MEMBERSHIP_ELF, VALIDATOR_MEMBERSHIP_ID};
 use risc0_ethereum_contracts::encode_seal;
+use risc0_steel::{ethereum::EthEvmEnv, Account};
 use risc0_zkvm::{default_prover, ExecutorEnv, ProverOpts, Receipt, VerifierContext};
 use std::{
     fs::{read, write},
@@ -35,8 +36,24 @@ use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 use url::Url;
 
 alloy::sol!(
+    struct Report {
+        uint256 clBalanceGwei;
+        uint256 withdrawalVaultBalanceWei;
+        uint256 totalDepositedValidators;
+        uint256 totalExitedValidators;
+    }
+
+    struct Commitment {
+        uint256 id;
+        bytes32 digest;
+        bytes32 configID;
+    }
+
+    /// @title Receiver of oracle reports and proof data
     #[sol(rpc, all_derives)]
-    "../contracts/src/IOracleProofReceiver.sol"
+    interface IOracleProofReceiver {
+        function update(uint256 refSlot, Report calldata r, bytes calldata seal, Commitment calldata commitment) external;
+    }
 );
 
 alloy::sol!(
@@ -123,7 +140,10 @@ enum BuildCommand {
         prior_max_validator_index: Option<u64>,
     },
     /// An aggregation (oracle) proof that can be submitted on-chain
-    Aggregation,
+    Aggregation {
+        #[clap(long, env)]
+        eth_rpc_url: Url,
+    },
 }
 
 #[derive(Parser, Debug)]
@@ -183,9 +203,9 @@ async fn main() -> Result<()> {
         Command::BuildInput {
             out_path,
             beacon_rpc_url,
-            command: BuildCommand::Aggregation { .. },
+            command: BuildCommand::Aggregation { eth_rpc_url },
         } => {
-            let input = build_aggregate_input(beacon_rpc_url, args.slot).await?;
+            let input = build_aggregate_input(beacon_rpc_url, args.slot, eth_rpc_url).await?;
             write(out_path, &bincode::serialize(&input)?)?;
         }
         Command::Prove {
@@ -369,13 +389,29 @@ struct AggregateProof {
 async fn build_aggregate_input<'a>(
     beacon_rpc_url: Url,
     slot: u64,
+    eth_rpc_url: Url,
 ) -> Result<guest_io::balance_and_exits::Input<'a>> {
-    let beacon_client = BeaconClient::new_with_cache(beacon_rpc_url, "./beacon-cache")?;
+    let beacon_client = BeaconClient::new_with_cache(beacon_rpc_url.clone(), "./beacon-cache")?;
     let beacon_block_header = beacon_client.get_block_header(slot).await?;
 
     let beacon_state = beacon_client.get_beacon_state(slot).await?;
-    let input =
-        guest_io::balance_and_exits::Input::build(&beacon_block_header.message, &beacon_state)?;
+
+    // Build the steel proof for the withdrawalVault balance
+    let mut env = EthEvmEnv::builder()
+        .rpc(eth_rpc_url)
+        .beacon_api(beacon_rpc_url)
+        .block_number(slot)
+        .build()
+        .await?;
+    let account = Account::preflight(WITHDRAWAL_VAULT_ADDRESS, &mut env);
+    let _info = account.info().await?;
+    let evm_input = env.into_input().await?;
+
+    let input = guest_io::balance_and_exits::Input::build(
+        &beacon_block_header.message,
+        &beacon_state,
+        evm_input,
+    )?;
 
     Ok(input)
 }
@@ -414,10 +450,7 @@ async fn submit_aggregate_proof(
     in_path: PathBuf,
 ) -> Result<()> {
     let wallet = EthereumWallet::from(eth_wallet_private_key);
-    let provider = ProviderBuilder::new()
-        .with_recommended_fillers()
-        .wallet(wallet)
-        .on_http(eth_rpc_url);
+    let provider = ProviderBuilder::new().wallet(wallet).on_http(eth_rpc_url);
 
     let proof: AggregateProof = bincode::deserialize(&read(in_path)?)?;
     tracing::info!("verifying locally for sanity check");
@@ -444,7 +477,13 @@ async fn submit_aggregate_proof(
         let contract = IOracleProofReceiver::new(contract, provider.clone());
         // skip the first 32 bytes of the journal as that is the beacon block hash which is not part of the report
         let report = Report::abi_decode(&proof.receipt.journal.bytes[32..], true)?;
-        let call_builder = contract.update(proof.slot.try_into()?, report, seal.clone().into());
+        let commitment = Commitment::abi_decode(&proof.receipt.journal.bytes[32 + 32..], true)?; // TODO: This is garbage
+        let call_builder = contract.update(
+            proof.slot.try_into()?,
+            report,
+            seal.clone().into(),
+            commitment,
+        );
         let pending_tx = call_builder.send().await?;
         tracing::info!("Submitted proof with tx hash: {}", pending_tx.tx_hash());
         let tx_receipt = pending_tx.get_receipt().await?;

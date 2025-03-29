@@ -14,7 +14,9 @@
 
 use crate::error::Result;
 use alloy_primitives::B256;
+use alloy_sol_types::sol;
 use bitvec::prelude::*;
+use risc0_steel::ethereum::EthEvmInput;
 use risc0_zkvm::{sha::Digest, Receipt};
 use ssz_multiproofs::Multiproof;
 #[cfg(feature = "builder")]
@@ -230,9 +232,11 @@ pub mod validator_membership {
 }
 
 pub mod balance_and_exits {
+    use risc0_steel::Commitment;
+
     use super::*;
 
-    #[derive(Debug, serde::Serialize, serde::Deserialize)]
+    #[derive(serde::Serialize, serde::Deserialize)]
     pub struct Input<'a> {
         /// Block that the proof is rooted in
         pub block_root: B256,
@@ -247,12 +251,18 @@ pub mod balance_and_exits {
         /// Merkle SSZ proof rooted in the beacon state
         #[serde(borrow)]
         pub state_multiproof: Multiproof<'a>,
+
+        pub evm_input: EthEvmInput,
     }
 
     #[cfg(feature = "builder")]
     impl Input<'_> {
-        #[tracing::instrument(skip(block_header, beacon_state))]
-        pub fn build(block_header: &BeaconBlockHeader, beacon_state: &BeaconState) -> Result<Self> {
+        #[tracing::instrument(skip(block_header, beacon_state, evm_input))]
+        pub fn build(
+            block_header: &BeaconBlockHeader,
+            beacon_state: &BeaconState,
+            evm_input: EthEvmInput,
+        ) -> Result<Self> {
             let block_root = block_header.hash_tree_root()?;
 
             let membership = beacon_state
@@ -291,6 +301,7 @@ pub mod balance_and_exits {
                 membership,
                 block_multiproof,
                 state_multiproof,
+                evm_input,
             })
         }
 
@@ -299,6 +310,16 @@ pub mod balance_and_exits {
                 input: self,
                 receipt: Some(receipt),
             }
+        }
+    }
+
+    sol! {
+        struct Journal {
+            uint256 clBalanceGwei;
+            uint256 withdrawalVaultBalanceWei;
+            uint256 totalDepositedValidators;
+            uint256 totalExitedValidators;
+            Commitment commitment;
         }
     }
 }

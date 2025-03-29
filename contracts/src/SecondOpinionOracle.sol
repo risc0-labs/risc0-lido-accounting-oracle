@@ -17,13 +17,22 @@
 pragma solidity ^0.8.20;
 
 import {IRiscZeroVerifier} from "risc0/IRiscZeroVerifier.sol";
+import {Steel} from "risc0/steel/Steel.sol";
 import {ISecondOpinionOracle} from "./ISecondOpinionOracle.sol";
-import {BlockRoots} from "./BlockRoots.sol";
 import {ImageID} from "./ImageID.sol"; // auto-generated contract after running `cargo build`.
 import {Report, IOracleProofReceiver} from "./IOracleProofReceiver.sol";
 
 /// @title LIP-23 Compatible Oracle implemented using RISC Zero
 contract SecondOpinionOracle is ISecondOpinionOracle, IOracleProofReceiver {
+    /// @notice The journal written by the RISC Zero verifier.
+    struct Journal {
+        uint256 clBalanceGwei;
+        uint256 withdrawalVaultBalanceWei;
+        uint256 totalDepositedValidators;
+        uint256 totalExitedValidators;
+        Steel.Commitment commitment;
+    }
+
     /// @notice RISC Zero verifier contract address.
     IRiscZeroVerifier public immutable verifier;
     uint256 public immutable genesis_block_timestamp;
@@ -44,13 +53,20 @@ contract SecondOpinionOracle is ISecondOpinionOracle, IOracleProofReceiver {
     }
 
     /// @notice Set an oracle report for a given slot by verifying the ZK proof
-    function update(uint256 refSlot, Report calldata r, bytes calldata seal) external {
-        bytes32 blockRoot = BlockRoots.findBlockRoot(genesis_block_timestamp, refSlot);
+    function update(uint256 refSlot, Report calldata r, bytes calldata seal, Steel.Commitment calldata commitment)
+        external
+    {
+        require(Steel.validateCommitment(commitment), "Invalid commitment");
 
-        bytes memory journal = abi.encodePacked(
-            blockRoot, r.clBalanceGwei, r.withdrawalVaultBalanceWei, r.totalDepositedValidators, r.totalExitedValidators
-        );
-        verifier.verify(seal, imageId, sha256(journal));
+        Journal memory journal = Journal({
+            clBalanceGwei: r.clBalanceGwei,
+            withdrawalVaultBalanceWei: r.withdrawalVaultBalanceWei,
+            totalDepositedValidators: r.totalDepositedValidators,
+            totalExitedValidators: r.totalExitedValidators,
+            commitment: commitment
+        });
+
+        verifier.verify(seal, imageId, sha256(abi.encode(journal)));
 
         // report is now considered valid for the given slot and can be stored
         reports[refSlot] = r;

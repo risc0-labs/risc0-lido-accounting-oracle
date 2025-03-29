@@ -13,9 +13,11 @@ risc0-build-ethereum = { workspace = true }
 risc0-zkp = { workspace = true }
 
 [dev-dependencies]
+alloy = { workspace = true, features = ["node-bindings"] }
 alloy-primitives = { workspace = true }
 alloy-sol-types = { workspace = true }
 risc0-zkvm = { workspace = true, features = ["client", "unstable"] }
+risc0-steel = { workspace = true, features = ["host"] }
 gindices.workspace = true
 guest-io = { workspace = true, features = ["builder"] }
 bitvec = { workspace = true }
@@ -24,3 +26,4 @@ anyhow = { workspace = true }
 membership_builder = { path = "../membership" }
 test-utils = { workspace = true }
 bincode = { workspace = true }
+tokio = { workspace = true }
