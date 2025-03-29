@@ -56,8 +56,7 @@ contract SecondOpinionOracle is ISecondOpinionOracle, IOracleProofReceiver {
 
     /// @notice Set an oracle report for a given slot by verifying the ZK proof
     function update(uint256 refSlot, Report calldata r, bytes calldata seal, Steel.Commitment calldata commitment) external {
-
-        
+        require(Steel.validateCommitment(commitment), "Invalid commitment");
 
         Journal memory journal = Journal({
             clBalanceGwei: r.clBalanceGwei,

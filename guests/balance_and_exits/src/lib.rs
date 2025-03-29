@@ -18,11 +18,13 @@ include!(concat!(env!("OUT_DIR"), "/methods.rs"));
 #[cfg(test)]
 mod tests {
     use alloy_primitives::utils::parse_ether;
+    use alloy_sol_types::SolValue;
     use ethereum_consensus::phase0::presets::mainnet::BeaconBlockHeader;
     use ethereum_consensus::ssz::prelude::*;
     use gindices::presets::mainnet::beacon_state::CAPELLA_FORK_SLOT;
     use guest_io::{
-        balance_and_exits, validator_membership, ANVIL_CHAIN_SPEC, WITHDRAWAL_VAULT_ADDRESS,
+        balance_and_exits::{self, Journal},
+        validator_membership, ANVIL_CHAIN_SPEC, WITHDRAWAL_VAULT_ADDRESS,
     };
     use risc0_steel::{ethereum::EthEvmEnv, Account};
     use risc0_zkvm::{default_executor, default_prover, ExecutorEnv};
@@ -108,6 +110,17 @@ mod tests {
         let session_info = default_executor().execute(env, super::BALANCE_AND_EXITS_ELF)?;
         println!("program execution returned: {:?}", session_info.journal);
         println!("total cycles: {}", session_info.cycles());
+
+        let journal = Journal::abi_decode(&session_info.journal.bytes, true).unwrap();
+        assert_eq!(
+            journal.withdrawalVaultBalanceWei,
+            parse_ether("33").unwrap(),
+            "balance should be 33 ether"
+        );
+        assert_eq!(
+            journal.totalDepositedValidators,
+            U256::from(n_lido_validators)
+        );
         Ok(())
     }
 }
