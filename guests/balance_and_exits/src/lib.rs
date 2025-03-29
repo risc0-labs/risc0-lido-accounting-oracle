@@ -43,7 +43,7 @@ mod tests {
         provider
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_balance_and_exits() -> anyhow::Result<()> {
         let n_validators = 10;
         let n_lido_validators = 1;
@@ -68,8 +68,9 @@ mod tests {
         let env = ExecutorEnv::builder()
             .write_frame(&bincode::serialize(&input).unwrap())
             .build()?;
-        let membership_proof =
-            default_prover().prove(env, membership_builder::VALIDATOR_MEMBERSHIP_ELF)?;
+        let membership_proof = tokio::task::block_in_place(|| {
+            default_prover().prove(env, membership_builder::VALIDATOR_MEMBERSHIP_ELF)
+        })?;
 
         // build the Steel input for reading the balance
         let provider = test_provider().await;

@@ -315,7 +315,6 @@ pub mod balance_and_exits {
 
     sol! {
         struct Journal {
-            bytes32 blockRoot;
             uint256 clBalanceGwei;
             uint256 withdrawalVaultBalanceWei;
             uint256 totalDepositedValidators;

@@ -27,7 +27,6 @@ import {Report, IOracleProofReceiver} from "./IOracleProofReceiver.sol";
 contract SecondOpinionOracle is ISecondOpinionOracle, IOracleProofReceiver {
     /// @notice The journal written by the RISC Zero verifier.
     struct Journal {
-        bytes32 blockRoot;
         uint256 clBalanceGwei;
         uint256 withdrawalVaultBalanceWei;
         uint256 totalDepositedValidators;
@@ -57,10 +56,10 @@ contract SecondOpinionOracle is ISecondOpinionOracle, IOracleProofReceiver {
 
     /// @notice Set an oracle report for a given slot by verifying the ZK proof
     function update(uint256 refSlot, Report calldata r, bytes calldata seal, Steel.Commitment calldata commitment) external {
-        bytes32 blockRoot = BlockRoots.findBlockRoot(genesis_block_timestamp, refSlot);
+
+        
 
         Journal memory journal = Journal({
-            blockRoot: blockRoot,
             clBalanceGwei: r.clBalanceGwei,
             withdrawalVaultBalanceWei: r.withdrawalVaultBalanceWei,
             totalDepositedValidators: r.totalDepositedValidators,

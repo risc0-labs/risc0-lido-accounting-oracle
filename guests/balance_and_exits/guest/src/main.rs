@@ -12,19 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use alloy_primitives::utils::Unit;
+use alloy_primitives::U256;
 use alloy_sol_types::SolValue;
 use bincode::deserialize;
 use bitvec::prelude::*;
 use bitvec::vec::BitVec;
 use gindices::presets::mainnet::beacon_block as beacon_block_gindices;
 use gindices::presets::mainnet::beacon_state as beacon_state_gindices;
-use guest_io::balance_and_exits::Input;
+use guest_io::balance_and_exits::{Input, Journal};
 use guest_io::validator_membership::Journal as MembershipJounal;
-use guest_io::{InputWithReceipt, WITHDRAWAL_CREDENTIALS};
+use guest_io::{InputWithReceipt, WITHDRAWAL_VAULT_ADDRESS};
 use membership_builder::VALIDATOR_MEMBERSHIP_ID;
 use risc0_steel::Account;
 use risc0_zkvm::guest::env;
+use risc0_zkvm::Receipt;
 use ssz_multiproofs::ValueIterator;
 use tracing_risc0::Risc0Formatter;
 use tracing_subscriber::fmt::format::FmtSpan;
@@ -40,7 +41,6 @@ pub fn main() {
         .init();
 
     let input_bytes = env::read_frame();
-
     let InputWithReceipt {
         input:
             Input {
@@ -52,6 +52,10 @@ pub fn main() {
             },
         receipt: membership_receipt,
     } = deserialize(&input_bytes).expect("Failed to deserialize input");
+
+    // TODO: Currently block_root is unconstrained making the whole guest unconstrained
+    //       This is included as part of the steel commitment and checked on-chain but currently
+    //       there is no way to access this from the Steel evm_input.
 
     block_multiproof
         .verify(&block_root)
@@ -66,40 +70,53 @@ pub fn main() {
         .expect("Failed to verify state multiproof");
     let mut values = multiproof.values();
 
+    // obtain the withdrawal vault balance from the EVM input
+    let env = evm_input.into_env();
+    let account = Account::new(WITHDRAWAL_VAULT_ADDRESS, &env);
+    let withdrawal_vault_balance: U256 = account.info().balance;
+
+    // Compute the required values from the beacon state values
     let num_validators = membership.count_ones() as u64;
     let num_exited_validators = count_exited_validators(&mut values, &membership, slot);
-
     let validator_count = get_validator_count(&mut values);
+    let cl_balance = accumulate_balances(&mut values, &membership);
 
+    // verify the membership proof
+    verify_membership(
+        state_root,
+        membership,
+        validator_count,
+        membership_receipt.expect("No membership receipt provided"),
+    );
+
+    // Commit the journal
+    let journal = Journal {
+        clBalanceGwei: U256::from(cl_balance),
+        withdrawalVaultBalanceWei: withdrawal_vault_balance.into(),
+        totalDepositedValidators: U256::from(num_validators),
+        totalExitedValidators: U256::from(num_exited_validators),
+        commitment: env.into_commitment(),
+    };
+    env::commit_slice(&journal.abi_encode());
+}
+
+fn verify_membership(
+    state_root: &Node,
+    membership: BitVec<u32, Lsb0>,
+    validator_count: u64,
+    membership_receipt: Receipt,
+) {
     let j = MembershipJounal {
         self_program_id: VALIDATOR_MEMBERSHIP_ID.into(),
         state_root: state_root.clone().into(),
         membership: membership,
         max_validator_index: validator_count - 1,
     };
-    let membership_receipt = membership_receipt.expect("Missing membership receipt");
+    let membership_receipt = membership_receipt;
     assert_eq!(membership_receipt.journal.bytes, j.to_bytes().unwrap());
     membership_receipt
         .verify(VALIDATOR_MEMBERSHIP_ID)
         .expect("Failed to verify membership receipt");
-
-    let cl_balance = accumulate_balances(&mut values, &j.membership);
-
-    // obtain the withdrawal vault balance from the EVM input
-    let env = evm_input.into_env();
-    let withdrawal_address_bytes: [u8; 20] = WITHDRAWAL_CREDENTIALS.0[12..].try_into().unwrap();
-    let account = Account::new(withdrawal_address_bytes.into(), &env);
-    let withdrawal_vault_balance: u64 = (account.info().balance / Unit::GWEI.wei())
-        .try_into()
-        .expect("U64 max value exceeded by withdrawal vault balance in gwei");
-
-    // write the outputs in ABI compatible format
-    env::commit_slice(&block_root.abi_encode());
-    env::commit_slice(&cl_balance.abi_encode());
-    env::commit_slice(&withdrawal_vault_balance.abi_encode());
-    env::commit_slice(&num_validators.abi_encode());
-    env::commit_slice(&num_exited_validators.abi_encode());
-    env::commit_slice(&num_exited_validators.abi_encode());
 }
 
 fn get_slot<'a, I: Iterator<Item = (u64, &'a Node)>>(values: &mut ValueIterator<'a, I, 32>) -> u64 {
@@ -126,7 +143,6 @@ fn get_validator_count<'a, I: Iterator<Item = (u64, &'a Node)>>(
     u64_from_b256(validator_count, 0)
 }
 
-#[tracing::instrument(skip(values, membership))]
 fn count_exited_validators<'a, I: Iterator<Item = (u64, &'a Node)>>(
     values: &mut ValueIterator<'a, I, 32>,
     membership: &BitVec<u32, Lsb0>,
@@ -148,7 +164,6 @@ fn count_exited_validators<'a, I: Iterator<Item = (u64, &'a Node)>>(
     num_exited_validators
 }
 
-#[tracing::instrument(skip(values, membership))]
 fn accumulate_balances<'a, I: Iterator<Item = (u64, &'a Node)>>(
     values: &mut ValueIterator<'a, I, 32>,
     membership: &BitVec<u32, Lsb0>,
