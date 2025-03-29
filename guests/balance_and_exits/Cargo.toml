@@ -27,4 +27,3 @@ membership_builder = { path = "../membership" }
 test-utils = { workspace = true }
 bincode = { workspace = true }
 tokio = { workspace = true }
-revm = {workspace = true}

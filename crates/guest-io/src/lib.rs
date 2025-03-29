@@ -16,6 +16,9 @@ mod error;
 mod io;
 
 use alloy_primitives::{address, Address};
+use revm::primitives::SpecId;
+use risc0_steel::config::ChainSpec;
+use std::sync::LazyLock;
 
 #[cfg(not(feature = "sepolia"))] // mainnet
 pub const WITHDRAWAL_CREDENTIALS: alloy_primitives::B256 = alloy_primitives::B256::new([
@@ -34,6 +37,12 @@ pub const WITHDRAWAL_CREDENTIALS: alloy_primitives::B256 = alloy_primitives::B25
 
 #[cfg(feature = "sepolia")]
 pub const WITHDRAWAL_VAULT_ADDRESS: Address = address!("De7318Afa67eaD6d6bbC8224dfCe5ed6e4b86d76");
+
+pub static ANVIL_CHAIN_SPEC: LazyLock<ChainSpec> =
+    LazyLock::new(|| ChainSpec::new_single(31337, SpecId::CANCUN));
+
+pub static SEPOLIA_CHAIN_SPEC: LazyLock<ChainSpec> =
+    LazyLock::new(|| ChainSpec::new_single(11155111, SpecId::LATEST));
 
 pub use error::{Error, Result};
 pub use io::*;

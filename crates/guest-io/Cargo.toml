@@ -21,6 +21,8 @@ bitvec.workspace = true
 thiserror = "2.0.6"
 tracing.workspace = true
 bytemuck.workspace = true
+revm = { workspace = true }
+
 
 # Optional dependencies
 gindices = { workspace = true, optional = true }
