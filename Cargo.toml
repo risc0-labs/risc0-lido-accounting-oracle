@@ -15,7 +15,7 @@ membership_builder.path = "./guests/membership"
 balance_and_exits_builder.path = "./guests/balance_and_exits"
 test-utils.path = "./crates/test-utils"
 
-alloy = { version = "0.11.1", features = ["full"] }
+alloy = { version = "0.12", features = ["full"] }
 alloy-primitives = { version = "0.8", default-features = false, features = ["rlp", "serde", "std"] }
 alloy-sol-types = { version = "0.8" }
 anyhow = { version = "1.0.75" }
