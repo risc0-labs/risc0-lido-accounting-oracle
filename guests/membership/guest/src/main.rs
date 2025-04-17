@@ -23,19 +23,9 @@ use guest_io::validator_membership::{
     Input, Journal, ProofType,
 };
 use guest_io::{InputWithReceipt, WITHDRAWAL_CREDENTIALS};
-use tracing_risc0::Risc0Formatter;
-use tracing_subscriber::fmt::format::FmtSpan;
-
 use risc0_zkvm::guest::env;
 
 pub fn main() {
-    tracing_subscriber::fmt()
-        .with_span_events(FmtSpan::ENTER | FmtSpan::EXIT)
-        .with_writer(env::stdout)
-        .without_time()
-        .event_format(Risc0Formatter)
-        .init();
-
     let input_bytes = env::read_frame();
 
     let InputWithReceipt {
