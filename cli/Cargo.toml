@@ -20,7 +20,7 @@ anyhow = { workspace = true }
 clap = { version = "4.0", features = ["derive", "env"] }
 log = { workspace = true }
 risc0-ethereum-contracts = { workspace = true }
-risc0-steel = { workspace = true, features = ["host"] }
+risc0-steel = { workspace = true, features = ["host", "unstable-history"] }
 risc0-zkvm = { workspace = true, features = ["client", "unstable"] }
 tokio = { version = "1.35", features = ["full"] }
 url = { workspace = true }

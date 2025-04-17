@@ -397,14 +397,20 @@ async fn build_aggregate_input<'a>(
     let beacon_state = beacon_client.get_beacon_state(slot).await?;
 
     // Build the steel proof for the withdrawalVault balance
+    let block = beacon_client.get_block(slot).await?;
+
     let mut env = EthEvmEnv::builder()
         .rpc(eth_rpc_url)
         .beacon_api(beacon_rpc_url)
-        .block_number(slot)
+        .block_number(block.body().execution_payload().unwrap().block_number())
         .build()
         .await?;
-    let account = Account::preflight(WITHDRAWAL_VAULT_ADDRESS, &mut env);
-    let _info = account.info().await?;
+
+    let _preflight_info = {
+        let account = Account::preflight(WITHDRAWAL_VAULT_ADDRESS, &mut env);
+        account.bytecode(true).info().await.unwrap()
+    };
+
     let evm_input = env.into_input().await?;
 
     let input = guest_io::balance_and_exits::Input::build(

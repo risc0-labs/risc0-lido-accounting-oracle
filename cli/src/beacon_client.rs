@@ -13,7 +13,10 @@
 // limitations under the License.
 
 use ethereum_consensus::{
-    phase0::SignedBeaconBlockHeader, primitives::Root, types::mainnet::BeaconState, Fork,
+    phase0::SignedBeaconBlockHeader,
+    primitives::Root,
+    types::mainnet::{BeaconBlock, BeaconState},
+    Fork,
 };
 use http_cache_reqwest::{CACacheManager, Cache, CacheMode, HttpCache, HttpCacheOptions};
 use reqwest::IntoUrl;
@@ -41,6 +44,12 @@ pub struct GetBlockHeaderResponse {
     pub root: Root,
     pub canonical: bool,
     pub header: SignedBeaconBlockHeader,
+}
+
+/// Response returned by the `get_block_header` API.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GetBlockResponse {
+    pub message: BeaconBlock,
 }
 
 /// Wrapper returned by the API calls.
@@ -110,6 +119,14 @@ impl BeaconClient {
         let path = format!("eth/v1/beacon/headers/{block_id}");
         let result: Response<GetBlockHeaderResponse> = self.http_get(&path).await?;
         Ok(result.data.header)
+    }
+
+    /// Retrieves block details for given block id.
+    #[tracing::instrument(skip(self), fields(block_id = %block_id))]
+    pub async fn get_block(&self, block_id: impl Display) -> Result<BeaconBlock, Error> {
+        let path = format!("eth/v2/beacon/blocks/{block_id}");
+        let result: Response<GetBlockResponse> = self.http_get(&path).await?;
+        Ok(result.data.message)
     }
 
     #[tracing::instrument(skip(self), fields(state_id = %state_id))]
