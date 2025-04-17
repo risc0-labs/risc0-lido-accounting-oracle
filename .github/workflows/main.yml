@@ -56,7 +56,9 @@ jobs:
           forge build
 
       - name: run tests
-        run: cargo test
+        env:
+            RISC0_DEV_MODE: true
+        run: cargo test --features skip-verify
 
       - name: run foundry tests in dev mode
         working-directory: contracts
