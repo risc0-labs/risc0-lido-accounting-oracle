@@ -26,11 +26,26 @@ const SOLIDITY_ELF_PATH: &str =
     concat!(env!("CARGO_MANIFEST_DIR"), "/../../contracts/tests/Elf.sol");
 
 fn main() {
+    let mut guest_features = Vec::new();
+
+    if env::var("CARGO_FEATURE_SKIP_VERIFY").is_ok() {
+        guest_features.push("skip-verify".to_string());
+    }
+
+    if env::var("CARGO_FEATURE_SEPOLIA").is_ok() {
+        guest_features.push("sepolia".to_string());
+    }
+
+    println!(
+        "cargo:warning=building guest with features: {:?}",
+        guest_features
+    );
+
     // Generate Rust source files for the methods crate.
     let guests = embed_methods_with_options(HashMap::from([(
         "balance_and_exits",
         GuestOptionsBuilder::default()
-            .features(Vec::new())
+            .features(guest_features)
             .build()
             .unwrap(),
     )]));

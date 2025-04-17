@@ -74,6 +74,7 @@ pub fn main() {
     let cl_balance = accumulate_balances(&mut values, &membership);
 
     // verify the membership proof
+    #[cfg(not(feature = "skip-verify"))]
     verify_membership(
         state_root,
         membership,

@@ -3,6 +3,10 @@ name = "balance_and_exits_builder"
 version = { workspace = true }
 edition = { workspace = true }
 
+[features]
+sepolia = []
+skip-verify = []
+
 [package.metadata.risc0]
 methods = ["guest"]
 
@@ -16,7 +20,7 @@ risc0-zkp = { workspace = true }
 alloy = { workspace = true, features = ["node-bindings"] }
 alloy-primitives = { workspace = true }
 alloy-sol-types = { workspace = true }
-risc0-zkvm = { workspace = true, features = ["client", "unstable"] }
+risc0-zkvm = { workspace = true, features = ["client", "unstable", "prove"] }
 risc0-steel = { workspace = true, features = ["host"] }
 gindices.workspace = true
 guest-io = { workspace = true, features = ["builder"] }

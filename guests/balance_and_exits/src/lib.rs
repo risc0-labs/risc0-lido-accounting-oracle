@@ -27,7 +27,7 @@ mod tests {
         validator_membership, ANVIL_CHAIN_SPEC, WITHDRAWAL_VAULT_ADDRESS,
     };
     use risc0_steel::{ethereum::EthEvmEnv, Account};
-    use risc0_zkvm::{default_executor, default_prover, ExecutorEnv};
+    use risc0_zkvm::{default_executor, ExecutorEnv, LocalProver, Prover};
     use test_utils::TestStateBuilder;
 
     use alloy::providers::{ext::AnvilApi, Provider, ProviderBuilder};
@@ -73,8 +73,9 @@ mod tests {
         let env = ExecutorEnv::builder()
             .write_frame(&bincode::serialize(&input).unwrap())
             .build()?;
+
         let membership_proof = tokio::task::block_in_place(|| {
-            default_prover().prove(env, membership_builder::VALIDATOR_MEMBERSHIP_ELF)
+            LocalProver::new("test").prove(env, membership_builder::VALIDATOR_MEMBERSHIP_ELF)
         })?;
 
         // build the Steel input for reading the balance

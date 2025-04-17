@@ -123,7 +123,7 @@ These are configured via environment variables. Copy the [.env.example] to a .en
 By default the repo builds the CLI and guest for mainnet but it also has a feature to configure it to work with Sepolia. Use 
 
 ```shell
-cargo build --release --features "seplolia"
+cargo build --release --features "sepolia"
 ```
 
 ### Contract Deployment

@@ -19,7 +19,7 @@ include!(concat!(env!("OUT_DIR"), "/methods.rs"));
 mod tests {
     use gindices::presets::mainnet::beacon_state::{CAPELLA_FORK_SLOT, SLOTS_PER_HISTORICAL_ROOT};
     use guest_io::validator_membership;
-    use risc0_zkvm::{default_executor, default_prover, ExecutorEnv, ExitCode};
+    use risc0_zkvm::{default_executor, ExecutorEnv, ExitCode, LocalProver, Prover};
     use test_utils::TestStateBuilder;
 
     #[test]
@@ -73,7 +73,7 @@ mod tests {
         let env = ExecutorEnv::builder()
             .write_frame(&bincode::serialize(&input).unwrap())
             .build()?;
-        let prove_info = default_prover().prove(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
+        let prove_info = LocalProver::new("test").prove(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
         prove_info.receipt.verify(super::VALIDATOR_MEMBERSHIP_ID)?;
 
         let input = validator_membership::Input::build_continuation(
@@ -119,7 +119,7 @@ mod tests {
         let env = ExecutorEnv::builder()
             .write_frame(&bincode::serialize(&input).unwrap())
             .build()?;
-        let prove_info = default_prover().prove(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
+        let prove_info = LocalProver::new("test").prove(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
 
         let input = validator_membership::Input::build_continuation(
             &s1,
@@ -164,7 +164,7 @@ mod tests {
         let env = ExecutorEnv::builder()
             .write_frame(&bincode::serialize(&input).unwrap())
             .build()?;
-        let prove_info = default_prover().prove(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
+        let prove_info = LocalProver::new("test").prove(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
 
         let input = validator_membership::Input::build_continuation(
             &s1,

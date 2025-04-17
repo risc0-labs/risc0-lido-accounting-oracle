@@ -97,7 +97,8 @@ pub fn main() {
                 prior_receipt.journal.bytes,
                 prior_proof_journal.to_bytes().unwrap()
             );
-            // Verify the prior membership proof. TODO: Figure out how to skip this in dev mode
+            // Verify the prior membership proof.
+            #[cfg(not(feature = "skip-verify"))]
             prior_receipt
                 .verify(self_program_id)
                 .expect("Failed to verify prior receipt");

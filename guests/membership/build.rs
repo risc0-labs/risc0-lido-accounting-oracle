@@ -17,9 +17,15 @@ use std::{collections::HashMap, env};
 use risc0_build::{embed_methods_with_options, GuestOptionsBuilder};
 
 fn main() {
-    let guest_features = env::var("CARGO_FEATURE_SEPOLIA")
-        .map(|_| vec!["sepolia".into()])
-        .unwrap_or_default();
+    let mut guest_features = Vec::new();
+
+    if env::var("CARGO_FEATURE_SKIP_VERIFY").is_ok() {
+        guest_features.push("skip-verify".to_string());
+    }
+
+    if env::var("CARGO_FEATURE_SEPOLIA").is_ok() {
+        guest_features.push("sepolia".to_string());
+    }
 
     println!(
         "cargo:warning=building guest with features: {:?}",
