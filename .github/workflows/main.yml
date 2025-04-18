@@ -36,10 +36,13 @@ jobs:
       - name: Install Foundry
         uses: risc0/foundry-toolchain@2fe7e70b520f62368a0e3c464f997df07ede420f
 
-      - name: risczero toolchain install
-        uses: risc0/risc0-ethereum/.github/actions/cargo-risczero-install@release-1.2
+      - name: install cargo risczero
+        uses: ./.github/actions/bininstall-risc0
         with:
-          ref: ${{ env.RISC0_MONOREPO_REF }}
+          risczero-version: "2.0.0"
+          toolchain-version: "1.85.0"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: build rust membership guest
         working-directory: guests/membership
