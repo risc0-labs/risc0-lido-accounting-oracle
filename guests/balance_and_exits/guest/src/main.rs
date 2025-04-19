@@ -45,10 +45,6 @@ pub fn main() {
         receipt: membership_receipt,
     } = deserialize(&input_bytes).expect("Failed to deserialize input");
 
-    // TODO: Currently block_root is unconstrained making the whole guest unconstrained
-    //       This is included as part of the steel commitment and checked on-chain but currently
-    //       there is no way to access this from the Steel evm_input.
-
     // obtain the withdrawal vault balance from the EVM input
     let env = evm_input.into_env().with_chain_spec(&ANVIL_CHAIN_SPEC);
     let account = Account::new(WITHDRAWAL_VAULT_ADDRESS, &env);
@@ -88,6 +84,7 @@ pub fn main() {
         withdrawalVaultBalanceWei: withdrawal_vault_balance.into(),
         totalDepositedValidators: U256::from(num_validators),
         totalExitedValidators: U256::from(num_exited_validators),
+        blockRoot: block_root.into(),
         commitment: env.into_commitment(),
     };
     env::commit_slice(&journal.abi_encode());

@@ -17,7 +17,7 @@
 pragma solidity ^0.8.20;
 
 import {IRiscZeroVerifier} from "risc0/IRiscZeroVerifier.sol";
-import {Steel} from "risc0/steel/Steel.sol";
+import {Steel, Beacon} from "risc0/steel/Steel.sol";
 import {ISecondOpinionOracle} from "./ISecondOpinionOracle.sol";
 import {ImageID} from "./ImageID.sol"; // auto-generated contract after running `cargo build`.
 import {Report, IOracleProofReceiver} from "./IOracleProofReceiver.sol";
@@ -30,15 +30,21 @@ contract SecondOpinionOracle is ISecondOpinionOracle, IOracleProofReceiver {
         uint256 withdrawalVaultBalanceWei;
         uint256 totalDepositedValidators;
         uint256 totalExitedValidators;
+        bytes32 blockRoot;
         Steel.Commitment commitment;
     }
 
     /// @notice RISC Zero verifier contract address.
     IRiscZeroVerifier public immutable verifier;
+
+    /// @notice The timestamp of the genesis block.
     uint256 public immutable genesis_block_timestamp;
 
     /// @notice Image ID of the only zkVM guest to accept verification from.
     bytes32 public constant imageId = ImageID.BALANCE_AND_EXITS_ID;
+
+    /// @notice Seconds per slot
+    uint256 public constant SECONDS_PER_SLOT = 12;
 
     /// @notice Oracle reports stored by refSlot.
     mapping(uint256 => Report) public reports;
@@ -58,11 +64,14 @@ contract SecondOpinionOracle is ISecondOpinionOracle, IOracleProofReceiver {
     {
         require(Steel.validateCommitment(commitment), "Invalid commitment");
 
+        bytes32 blockRoot = Beacon.parentBlockRoot(_timestampAtSlot(refSlot + 1));
+
         Journal memory journal = Journal({
             clBalanceGwei: r.clBalanceGwei,
             withdrawalVaultBalanceWei: r.withdrawalVaultBalanceWei,
             totalDepositedValidators: r.totalDepositedValidators,
             totalExitedValidators: r.totalExitedValidators,
+            blockRoot: blockRoot,
             commitment: commitment
         });
 
@@ -93,5 +102,9 @@ contract SecondOpinionOracle is ISecondOpinionOracle, IOracleProofReceiver {
             report.totalDepositedValidators,
             report.totalExitedValidators
         );
+    }
+
+    function _timestampAtSlot(uint256 slot) internal view returns (uint256) {
+        return genesis_block_timestamp + slot * SECONDS_PER_SLOT;
     }
 }

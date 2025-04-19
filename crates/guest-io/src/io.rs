@@ -319,6 +319,7 @@ pub mod balance_and_exits {
             uint256 withdrawalVaultBalanceWei;
             uint256 totalDepositedValidators;
             uint256 totalExitedValidators;
+            bytes32 blockRoot;
             Commitment commitment;
         }
     }
