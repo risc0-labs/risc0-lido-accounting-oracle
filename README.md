@@ -107,6 +107,8 @@ cargo risczero --version
 
 This repo uses [just](https://github.com/casey/just) as a command runner. Installation instructions [here](https://github.com/casey/just?tab=readme-ov-file#installation)
 
+It also uses git-lfs to manage cached inputs. Ensure this is installed.
+
 ## Usage
 
 ### Configuration
