@@ -137,7 +137,12 @@ enum BuildCommand {
     /// A continuation from a prior membership proof
     ContinuationFrom {
         prior_slot: u64,
+
+        #[clap(long, conflicts_with = "prior_input_path")]
         prior_max_validator_index: Option<u64>,
+
+        #[clap(long, conflicts_with = "prior_max_validator_index")]
+        prior_input_path: Option<PathBuf>,
     },
     /// An aggregation (oracle) proof that can be submitted on-chain
     Aggregation {
@@ -188,8 +193,18 @@ async fn main() -> Result<()> {
                 BuildCommand::ContinuationFrom {
                     prior_slot,
                     prior_max_validator_index,
+                    prior_input_path,
                 },
         } => {
+            let prior_max_validator_index = if let Some(prior_input_path) = prior_input_path {
+                let input_data = read(prior_input_path)?;
+                let input: guest_io::validator_membership::Input =
+                    bincode::deserialize(&input_data)?;
+                Some(input.max_validator_index)
+            } else {
+                prior_max_validator_index
+            };
+
             let input = build_membership_input(
                 beacon_rpc_url,
                 args.slot,

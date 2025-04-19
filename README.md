@@ -147,34 +147,32 @@ These are mostly included for example usage of the CLI. For a production deploym
 
 #### Initial membership proof
 
-To create an initial membership proof for a given slot (e.g. slot 1000) run
+The repo comes with the mainnet inputs built for slot 11494239.
+
+To create a proof run
 
 ```shell
-just build_input_initialization 1000
-prove_membership_init 1000
+prove_membership_init 11494239
 ```
-
-> [!WARNING]
-> Attempting to initialize at a recent slot with many validators will be slow and may exceed the ZKVM memory limit if not split correctly with --max-validator-index
 
 #### Updating a membership proof
 
-Update an existing membership proof to slot 1100 run
+Update an existing membership proof to a newer beacon chain slot, e.g. to slot 11495000, you will need to build the inputs and then build a proof. Run
 
 ```shell
-just build_input_continuation 1000 1100
-just prove_membership_continuation 1000 1100
+just build_input_continuation 11494239 11495000
+just prove_membership_continuation 11494239 11495000
 ```
 
-This will write a new proof that composes the old one and proves the membership of all validators up to slot 1100. There is no need to update membership proofs but it is a good way to save proving cycles.
+This will write a new proof that composes the old one and proves the membership of all validators up to slot 11495000. There is no need to update membership proofs but it is a good way to save proving cycles.
 
 #### Building an aggregate oracle proof
 
-To build a proof ready to submit on-chain run:
+To build a proof at this new slot ready to submit on-chain run:
 
 ```shell
-just build_input_aggregation 1100
-just prove_aggregate 1100
+just build_input_aggregation 11495000
+just prove_aggregate 11495000
 ```
 
 This requires that a membership proof (either initial or continuation) for slot 1100 has already been created. It will write to file a proof and report ready to submit on-chain
@@ -185,7 +183,7 @@ This requires that a membership proof (either initial or continuation) for slot 
 Submit on-chain with:
 
 ```shell
-just submit 1100
+just submit 11495000
 ```
 
 #### More advanced usage

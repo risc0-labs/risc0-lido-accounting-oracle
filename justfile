@@ -10,7 +10,7 @@ build_input_initialization slot: build
     ./target/release/cli --slot {{slot}} build --out ./input_membership_initialization_{{slot}}.input initial
 
 build_input_continuation prior_slot slot: build
-    ./target/release/cli --slot {{slot}} build --out ./input_membership_continuation_{{prior_slot}}_to_{{slot}}.input continuation-from {{prior_slot}} 
+    ./target/release/cli --slot {{slot}} build --out ./input_membership_continuation_{{prior_slot}}_to_{{slot}}.input continuation-from {{prior_slot}} --prior-input-path ./input_membership_initialization_{{prior_slot}}.input
 
 build_input_aggregation slot: build
     ./target/release/cli --slot {{slot}} build --out ./input_aggregation_{{slot}}.input aggregation
