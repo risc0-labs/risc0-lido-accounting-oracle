@@ -251,7 +251,7 @@ dependencies = [
  "either",
  "once_cell",
  "serde",
- "sha2 0.10.8",
+ "sha2",
 ]
 
 [[package]]
@@ -940,7 +940,7 @@ dependencies = [
  "digest 0.10.7",
  "fnv",
  "merlin",
- "sha2 0.10.8",
+ "sha2",
 ]
 
 [[package]]
@@ -1396,7 +1396,7 @@ dependencies = [
  "anyhow",
  "bincode",
  "bitvec",
- "ethereum-consensus 0.1.1 (git+https://github.com/ralexstokes/ethereum-consensus.git?rev=8fbd8a53dca0170bedeca40a92ee70fd48c4615b)",
+ "ethereum-consensus 0.1.1 (git+https://github.com/gattaca-com/ethereum-consensus.git?rev=072fb2c5abdc8585db5ea6136db561b733a56234)",
  "gindices",
  "guest-io",
  "hex",
@@ -1445,6 +1445,16 @@ name = "base64ct"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c3c1a368f70d6cf7302d78f8f7093da241fb8e8807c05cc9e51a125895a6d5b"
+
+[[package]]
+name = "beacon-state"
+version = "0.1.0"
+dependencies = [
+ "ethereum-consensus 0.1.1 (git+https://github.com/gattaca-com/ethereum-consensus.git?rev=072fb2c5abdc8585db5ea6136db561b733a56234)",
+ "serde",
+ "serde_json",
+ "ssz_rs",
+]
 
 [[package]]
 name = "bimap"
@@ -1524,15 +1534,6 @@ name = "block"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0d8c1fef690941d3e7788d328517591fecc684c084084702d6ff1641e993699a"
-
-[[package]]
-name = "block-buffer"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4152116fd6e9dadb291ae18fc1ec3575ed6d84c29642d97890f4b4a3417297e4"
-dependencies = [
- "generic-array",
-]
 
 [[package]]
 name = "block-buffer"
@@ -1677,7 +1678,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "sha1",
- "sha2 0.10.8",
+ "sha2",
  "ssri",
  "tempfile",
  "thiserror 1.0.69",
@@ -1815,10 +1816,11 @@ dependencies = [
  "alloy-sol-types",
  "anyhow",
  "balance_and_exits_builder",
+ "beacon-state",
  "bincode",
  "bytemuck",
  "clap",
- "ethereum-consensus 0.1.1 (git+https://github.com/ralexstokes/ethereum-consensus.git?rev=8fbd8a53dca0170bedeca40a92ee70fd48c4615b)",
+ "ethereum-consensus 0.1.1 (git+https://github.com/gattaca-com/ethereum-consensus.git?rev=072fb2c5abdc8585db5ea6136db561b733a56234)",
  "guest-io",
  "http-cache-reqwest",
  "log",
@@ -2246,7 +2248,7 @@ version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
 dependencies = [
- "block-buffer 0.10.4",
+ "block-buffer",
  "const-oid",
  "crypto-common",
  "subtle",
@@ -2567,7 +2569,7 @@ dependencies = [
 [[package]]
 name = "ethereum-consensus"
 version = "0.1.1"
-source = "git+https://github.com/ralexstokes/ethereum-consensus.git?rev=8fbd8a53dca0170bedeca40a92ee70fd48c4615b#8fbd8a53dca0170bedeca40a92ee70fd48c4615b"
+source = "git+https://github.com/gattaca-com/ethereum-consensus.git?rev=072fb2c5abdc8585db5ea6136db561b733a56234#072fb2c5abdc8585db5ea6136db561b733a56234"
 dependencies = [
  "blst",
  "bs58",
@@ -2581,7 +2583,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
- "sha2 0.10.8",
+ "sha2",
  "ssz_rs",
  "thiserror 1.0.69",
 ]
@@ -2603,23 +2605,11 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
- "sha2 0.10.8",
+ "sha2",
  "ssz_rs",
  "thiserror 1.0.69",
  "tokio",
  "tokio-stream",
-]
-
-[[package]]
-name = "ethereum_hashing"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ea7b408432c13f71af01197b1d3d0069c48a27bfcfbe72a81fc346e47f6defb"
-dependencies = [
- "cpufeatures",
- "lazy_static",
- "ring",
- "sha2 0.10.8",
 ]
 
 [[package]]
@@ -2958,7 +2948,7 @@ name = "gindices"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "ethereum-consensus 0.1.1 (git+https://github.com/ralexstokes/ethereum-consensus.git?rev=8fbd8a53dca0170bedeca40a92ee70fd48c4615b)",
+ "ethereum-consensus 0.1.1 (git+https://github.com/gattaca-com/ethereum-consensus.git?rev=072fb2c5abdc8585db5ea6136db561b733a56234)",
  "ssz_rs",
 ]
 
@@ -2996,9 +2986,10 @@ version = "0.1.0"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
+ "beacon-state",
  "bitvec",
  "bytemuck",
- "ethereum-consensus 0.1.1 (git+https://github.com/ralexstokes/ethereum-consensus.git?rev=8fbd8a53dca0170bedeca40a92ee70fd48c4615b)",
+ "ethereum-consensus 0.1.1 (git+https://github.com/gattaca-com/ethereum-consensus.git?rev=072fb2c5abdc8585db5ea6136db561b733a56234)",
  "gindices",
  "revm",
  "risc0-steel",
@@ -3766,7 +3757,7 @@ dependencies = [
  "cfg-if",
  "ecdsa 0.14.8",
  "elliptic-curve 0.12.3",
- "sha2 0.10.8",
+ "sha2",
 ]
 
 [[package]]
@@ -3780,7 +3771,7 @@ dependencies = [
  "elliptic-curve 0.13.8",
  "once_cell",
  "serdect",
- "sha2 0.10.8",
+ "sha2",
 ]
 
 [[package]]
@@ -4033,7 +4024,7 @@ dependencies = [
  "anyhow",
  "bincode",
  "bitvec",
- "ethereum-consensus 0.1.1 (git+https://github.com/ralexstokes/ethereum-consensus.git?rev=8fbd8a53dca0170bedeca40a92ee70fd48c4615b)",
+ "ethereum-consensus 0.1.1 (git+https://github.com/gattaca-com/ethereum-consensus.git?rev=072fb2c5abdc8585db5ea6136db561b733a56234)",
  "gindices",
  "guest-io",
  "hex",
@@ -4181,7 +4172,7 @@ dependencies = [
  "core2",
  "digest 0.10.7",
  "multihash-derive",
- "sha2 0.10.8",
+ "sha2",
  "unsigned-varint",
 ]
 
@@ -4442,12 +4433,6 @@ name = "once_cell"
 version = "1.20.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1261fe7e33c73b354eab43b1273a57c8f967d0391e80353e51f764ac02cf6775"
-
-[[package]]
-name = "opaque-debug"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
 
 [[package]]
 name = "openssl"
@@ -5289,7 +5274,7 @@ dependencies = [
  "revm-primitives",
  "ripemd",
  "secp256k1",
- "sha2 0.10.8",
+ "sha2",
  "substrate-bn",
 ]
 
@@ -5431,7 +5416,7 @@ dependencies = [
  "glob",
  "hex",
  "rayon",
- "sha2 0.10.8",
+ "sha2",
  "tempfile",
 ]
 
@@ -5491,7 +5476,7 @@ dependencies = [
  "risc0-sys",
  "risc0-zkp",
  "serde",
- "sha2 0.10.8",
+ "sha2",
  "tracing",
  "zip",
 ]
@@ -5626,7 +5611,7 @@ dependencies = [
  "revm",
  "serde",
  "serde_json",
- "sha2 0.10.8",
+ "sha2",
  "stability",
  "thiserror 2.0.9",
  "tokio",
@@ -5679,7 +5664,7 @@ dependencies = [
  "risc0-sys",
  "risc0-zkvm-platform",
  "serde",
- "sha2 0.10.8",
+ "sha2",
  "stability",
  "tracing",
 ]
@@ -5724,7 +5709,7 @@ dependencies = [
  "rzup",
  "semver 1.0.24",
  "serde",
- "sha2 0.10.8",
+ "sha2",
  "stability",
  "tempfile",
  "tracing",
@@ -6205,19 +6190,6 @@ dependencies = [
 
 [[package]]
 name = "sha2"
-version = "0.9.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d58a1e1bf39749807d89cf2d98ac2dfa0ff1cb3faa38fbb64dd88ac8013d800"
-dependencies = [
- "block-buffer 0.9.0",
- "cfg-if",
- "cpufeatures",
- "digest 0.9.0",
- "opaque-debug",
-]
-
-[[package]]
-name = "sha2"
 version = "0.10.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "793db75ad2bcafc3ffa7c68b215fee268f537982cd901d132f89c6343f3a3dc8"
@@ -6378,7 +6350,7 @@ dependencies = [
  "miette",
  "serde",
  "sha-1",
- "sha2 0.10.8",
+ "sha2",
  "thiserror 1.0.69",
  "xxhash-rust",
 ]
@@ -6390,8 +6362,7 @@ dependencies = [
  "alloy-primitives",
  "anyhow",
  "bitvec",
- "ethereum-consensus 0.1.1 (git+https://github.com/ralexstokes/ethereum-consensus.git?rev=8fbd8a53dca0170bedeca40a92ee70fd48c4615b)",
- "gindices",
+ "ethereum-consensus 0.1.1 (git+https://github.com/gattaca-com/ethereum-consensus.git?rev=072fb2c5abdc8585db5ea6136db561b733a56234)",
  "indicatif",
  "itertools 0.14.0",
  "postcard",
@@ -6399,7 +6370,7 @@ dependencies = [
  "risc0-zkvm",
  "serde",
  "serde_json",
- "sha2 0.10.8",
+ "sha2",
  "ssz_rs",
  "thiserror 2.0.9",
  "tracing",
@@ -6408,14 +6379,13 @@ dependencies = [
 [[package]]
 name = "ssz_rs"
 version = "0.9.0"
-source = "git+https://github.com/willemolding/ssz-rs?rev=41c4ecd24ab9ca85ec6cae11d4227410f9363f37#41c4ecd24ab9ca85ec6cae11d4227410f9363f37"
+source = "git+https://github.com/ec2/ssz-rs?rev=86be2a71c2bd4d5b454a8e86b83af1effd1e14d8#86be2a71c2bd4d5b454a8e86b83af1effd1e14d8"
 dependencies = [
  "alloy-primitives",
  "bitvec",
- "ethereum_hashing",
  "rayon",
  "serde",
- "sha2 0.9.9",
+ "sha2",
  "ssz_rs_derive",
  "thread_local",
  "tracing",
@@ -6424,7 +6394,7 @@ dependencies = [
 [[package]]
 name = "ssz_rs_derive"
 version = "0.9.0"
-source = "git+https://github.com/willemolding/ssz-rs?rev=41c4ecd24ab9ca85ec6cae11d4227410f9363f37#41c4ecd24ab9ca85ec6cae11d4227410f9363f37"
+source = "git+https://github.com/ec2/ssz-rs?rev=86be2a71c2bd4d5b454a8e86b83af1effd1e14d8#86be2a71c2bd4d5b454a8e86b83af1effd1e14d8"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -6672,7 +6642,7 @@ dependencies = [
  "alloy-sol-types",
  "anyhow",
  "bitvec",
- "ethereum-consensus 0.1.1 (git+https://github.com/ralexstokes/ethereum-consensus.git?rev=8fbd8a53dca0170bedeca40a92ee70fd48c4615b)",
+ "ethereum-consensus 0.1.1 (git+https://github.com/gattaca-com/ethereum-consensus.git?rev=072fb2c5abdc8585db5ea6136db561b733a56234)",
  "gindices",
  "guest-io",
 ]

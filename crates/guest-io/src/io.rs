@@ -22,8 +22,8 @@ use ssz_multiproofs::Multiproof;
 #[cfg(feature = "builder")]
 use {
     crate::error::Error,
+    beacon_state::mainnet::BeaconState,
     ethereum_consensus::phase0::{presets::mainnet::HistoricalBatch, BeaconBlockHeader},
-    ethereum_consensus::types::mainnet::BeaconState,
     gindices::presets::mainnet::{
         beacon_block as beacon_block_gindices, beacon_state as beacon_state_gindices,
         beacon_state::SLOTS_PER_HISTORICAL_ROOT, historical_batch as historical_batch_gindices,
@@ -336,5 +336,6 @@ fn build_with_versioned_state(
         BeaconState::Bellatrix(b) => Ok(builder.build(b)?),
         BeaconState::Capella(b) => Ok(builder.build(b)?),
         BeaconState::Deneb(b) => Ok(builder.build(b)?),
+        BeaconState::Electra(b) => Ok(builder.build(b)?),
     }
 }

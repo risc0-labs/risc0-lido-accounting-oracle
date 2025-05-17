@@ -51,6 +51,7 @@ use crate::Descriptor;
 #[derive(Debug, PartialEq, Default, serde::Deserialize, serde::Serialize)]
 pub struct Multiproof<'a> {
     /// The merkle tree nodes corresponding to both leaves and internal proof nodes
+    #[serde(borrow)]
     pub(crate) data: Cow<'a, [u8]>,
 
     /// mask indicating which nodes are values (1) or proof supporting nodes (0)
@@ -63,7 +64,7 @@ pub struct Multiproof<'a> {
     pub(crate) max_stack_depth: usize,
 }
 
-impl<'a> Multiproof<'a> {
+impl Multiproof<'_> {
     /// Verify this multi-proof against a given root
     #[tracing::instrument(skip(self))]
     pub fn verify<const CHUNK_SIZE: usize>(&self, root: &[u8; CHUNK_SIZE]) -> Result<()> {
@@ -174,7 +175,7 @@ impl<'a> GIndexIterator<'a> {
     }
 }
 
-impl<'a> Iterator for GIndexIterator<'a> {
+impl Iterator for GIndexIterator<'_> {
     type Item = u64;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -200,7 +201,7 @@ enum TreeNode<'a, const CHUNK_SIZE: usize> {
     Internal,
 }
 
-impl<'a, const CHUNK_SIZE: usize> TreeNode<'a, CHUNK_SIZE> {
+impl<const CHUNK_SIZE: usize> TreeNode<'_, CHUNK_SIZE> {
     fn has_value(&self) -> bool {
         matches!(self, TreeNode::Leaf(_)) || matches!(self, TreeNode::Computed(_))
     }

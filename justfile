@@ -1,7 +1,7 @@
 set dotenv-load := true
 
 build:
-    cargo build --release
+    cargo build --release --features sepolia
 
 
 ## Input building tasks

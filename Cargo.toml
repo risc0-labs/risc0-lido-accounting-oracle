@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["cli", "guests/membership", "guests/balance_and_exits", "crates/ssz-multiproofs", "crates/gindices", "crates/guest-io", "crates/tracing-risc0", "crates/test-utils"]
+members = ["cli", "guests/membership", "guests/balance_and_exits", "crates/ssz-multiproofs", "crates/gindices", "crates/guest-io", "crates/tracing-risc0", "crates/test-utils", "crates/beacon-state"]
 
 [workspace.package]
 version = "0.1.0"
@@ -14,6 +14,7 @@ guest-io.path = "./crates/guest-io"
 membership_builder.path = "./guests/membership"
 balance_and_exits_builder.path = "./guests/balance_and_exits"
 test-utils.path = "./crates/test-utils"
+beacon-state.path = "./crates/beacon-state"
 
 alloy = { version = "0.12", features = ["full"] }
 alloy-primitives = { version = "0.8", default-features = false, features = ["rlp", "serde", "std"] }
@@ -33,10 +34,11 @@ risc0-zkp = { version = "2.0" }
 risc0-zkvm-platform = { version = "2.0", default-features = false }
 revm = { version = "19.2", default-features = false, features = ["std"] }
 
-ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus.git", rev = "8fbd8a53dca0170bedeca40a92ee70fd48c4615b", default-features = false, features = ["serde"] }
-ssz_rs = { git = "https://github.com/willemolding/ssz-rs", rev = "41c4ecd24ab9ca85ec6cae11d4227410f9363f37"}
+ethereum-consensus = { git = "https://github.com/gattaca-com/ethereum-consensus.git", rev = "072fb2c5abdc8585db5ea6136db561b733a56234", default-features = false }
+ssz_rs = { git = "https://github.com/ec2/ssz-rs", rev = "86be2a71c2bd4d5b454a8e86b83af1effd1e14d8"}
 
 serde = { version = "1.0", features = ["derive", "std"] }
+serde_json = "1.0.133"
 url = { version = "2.5" }
 bitvec = { version = "1", features = ["serde"] }
 sha2 = "0.10.8"
@@ -55,4 +57,4 @@ overflow-checks = false # Skip overflow checks for better performance
 
 [patch."https://github.com/ralexstokes/ssz-rs"]
 # Get the merkle tree empty node virtualization so non-trivial merkle trees actually fit in memory
-ssz_rs = { git = "https://github.com/willemolding/ssz-rs", rev = "41c4ecd24ab9ca85ec6cae11d4227410f9363f37"}
+ssz_rs = { git = "https://github.com/ec2/ssz-rs", rev = "86be2a71c2bd4d5b454a8e86b83af1effd1e14d8"}

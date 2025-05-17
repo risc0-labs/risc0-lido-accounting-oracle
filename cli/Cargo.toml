@@ -12,6 +12,7 @@ ssz-multiproofs.workspace = true
 guest-io = { workspace = true, features = ["builder", "progress-bar"] }
 membership_builder.workspace = true
 balance_and_exits_builder.workspace = true
+beacon-state = { workspace = true }
 
 alloy = { workspace = true }
 alloy-primitives = { workspace = true }
@@ -28,7 +29,7 @@ ethereum-consensus.workspace = true
 serde.workspace = true
 thiserror = "2.0.6"
 reqwest = "0.12.9"
-serde_json = "1.0.133"
+serde_json = { workspace = true }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 reqwest-cache = "0.1.3"

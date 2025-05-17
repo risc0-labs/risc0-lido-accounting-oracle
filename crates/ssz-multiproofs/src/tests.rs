@@ -91,9 +91,6 @@ fn test_proving_state_roots() {
 
     assert_eq!(
         multiproof.values().next(),
-        Some((
-            gindex as u64,
-            &beacon_state.state_roots[10].try_into().unwrap()
-        ))
+        Some((gindex as u64, &beacon_state.state_roots[10].into()))
     );
 }

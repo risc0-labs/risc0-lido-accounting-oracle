@@ -152,7 +152,7 @@ The repo comes with the mainnet inputs built for slot 11494239.
 To create a proof run
 
 ```shell
-prove_membership_init 11494239
+just prove_membership_init 11494239
 ```
 
 #### Updating a membership proof
