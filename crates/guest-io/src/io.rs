@@ -25,7 +25,7 @@ use {
     beacon_state::mainnet::BeaconState,
     ethereum_consensus::phase0::{presets::mainnet::HistoricalBatch, BeaconBlockHeader},
     gindices::presets::mainnet::{
-        beacon_block as beacon_block_gindices, beacon_state as beacon_state_gindices,
+        beacon_block as beacon_block_gindices, beacon_state::post_electra as beacon_state_gindices,
         beacon_state::SLOTS_PER_HISTORICAL_ROOT, historical_batch as historical_batch_gindices,
     },
     ssz_multiproofs::MultiproofBuilder,

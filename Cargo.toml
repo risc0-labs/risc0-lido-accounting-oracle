@@ -34,7 +34,7 @@ risc0-zkp = { version = "2.0" }
 risc0-zkvm-platform = { version = "2.0", default-features = false }
 revm = { version = "19.2", default-features = false, features = ["std"] }
 
-ethereum-consensus = { git = "https://github.com/gattaca-com/ethereum-consensus.git", rev = "072fb2c5abdc8585db5ea6136db561b733a56234", default-features = false }
+ethereum-consensus = { git = "https://github.com/gattaca-com/ethereum-consensus.git", rev = "072fb2c5abdc8585db5ea6136db561b733a56234", default-features = false, features = ["serde"] }
 ssz_rs = { git = "https://github.com/ec2/ssz-rs", rev = "86be2a71c2bd4d5b454a8e86b83af1effd1e14d8"}
 
 serde = { version = "1.0", features = ["derive", "std"] }

@@ -1,3 +1,6 @@
+mod gen_post_electra;
+mod gen_pre_electra;
+
 pub mod presets {
     pub mod mainnet {
 
@@ -18,7 +21,7 @@ pub mod presets {
 
             pub mod post_electra {
                 use super::*;
-                include!(concat!(env!("OUT_DIR"), "/gen_post_electra.rs"));
+                pub use crate::gen_post_electra::*;
 
                 pub fn state_roots(slot: u64) -> u64 {
                     // note this only holds if slot < state.slot <= slot + SLOTS_PER_HISTORICAL_ROOT
@@ -51,7 +54,7 @@ pub mod presets {
 
             pub mod pre_electra {
                 use super::*;
-                include!(concat!(env!("OUT_DIR"), "/gen_pre_electra.rs"));
+                pub use crate::gen_pre_electra::*;
 
                 pub fn state_roots(slot: u64) -> u64 {
                     // note this only holds if slot < state.slot <= slot + SLOTS_PER_HISTORICAL_ROOT

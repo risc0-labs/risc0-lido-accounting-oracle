@@ -1,14 +1,11 @@
 use ssz_rs::GeneralizedIndexable;
 use ssz_rs::Path;
 use ssz_rs::PathElement;
-use std::env;
 use std::fs;
 use std::io::Write;
 
 fn main() {
-    let out_dir = env::var_os("OUT_DIR").unwrap();
-
-    let dest_filepath = std::path::Path::new(&out_dir).join("gen_pre_electra.rs");
+    let dest_filepath = std::path::Path::new("src/gen_pre_electra.rs");
     let mut f = fs::OpenOptions::new()
         .write(true)
         .create(true)
@@ -17,7 +14,7 @@ fn main() {
         .unwrap();
     write_gindex_fns::<_, ethereum_consensus::capella::presets::mainnet::BeaconState>(&mut f);
 
-    let dest_filepath = std::path::Path::new(&out_dir).join("gen_post_electra.rs");
+    let dest_filepath = std::path::Path::new("src/gen_post_electra.rs");
     let mut f = fs::OpenOptions::new()
         .write(true)
         .create(true)

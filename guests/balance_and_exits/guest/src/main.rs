@@ -18,7 +18,7 @@ use bincode::deserialize;
 use bitvec::prelude::*;
 use bitvec::vec::BitVec;
 use gindices::presets::mainnet::beacon_block as beacon_block_gindices;
-use gindices::presets::mainnet::beacon_state as beacon_state_gindices;
+use gindices::presets::mainnet::beacon_state::post_electra as beacon_state_gindices;
 use guest_io::balance_and_exits::{Input, Journal};
 use guest_io::validator_membership::Journal as MembershipJounal;
 use guest_io::ANVIL_CHAIN_SPEC;

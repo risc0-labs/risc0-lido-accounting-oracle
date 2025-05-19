@@ -2948,6 +2948,7 @@ name = "gindices"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "beacon-state",
  "ethereum-consensus 0.1.1 (git+https://github.com/gattaca-com/ethereum-consensus.git?rev=072fb2c5abdc8585db5ea6136db561b733a56234)",
  "ssz_rs",
 ]
@@ -6363,6 +6364,7 @@ dependencies = [
  "anyhow",
  "bitvec",
  "ethereum-consensus 0.1.1 (git+https://github.com/gattaca-com/ethereum-consensus.git?rev=072fb2c5abdc8585db5ea6136db561b733a56234)",
+ "gindices",
  "indicatif",
  "itertools 0.14.0",
  "postcard",

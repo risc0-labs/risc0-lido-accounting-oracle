@@ -9,7 +9,7 @@ ethereum-consensus.workspace = true
 anyhow.workspace = true
 beacon-state.workspace = true
 
-[build-dependencies]
-ssz_rs.workspace = true
-ethereum-consensus.workspace = true
-beacon-state.workspace = true
+# [build-dependencies]
+# ssz_rs.workspace = true
+# ethereum-consensus = { workspace = true, optional = true }
+# beacon-state.workspace = true
