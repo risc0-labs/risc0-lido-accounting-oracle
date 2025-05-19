@@ -16,7 +16,6 @@ use crate::multiproof::{calculate_max_stack_depth, Multiproof};
 use crate::{Descriptor, Result};
 #[cfg(feature = "progress-bar")]
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
-use itertools::Itertools;
 use rayon::prelude::*;
 use ssz_rs::prelude::{GeneralizedIndex, GeneralizedIndexable, Path, Prove};
 use ssz_rs::proofs::Prover;
@@ -78,21 +77,17 @@ impl MultiproofBuilder {
     pub fn build<T: Prove + Sync>(self, container: &T) -> Result<Multiproof<'static>> {
         let gindices = self.gindices.into_iter().collect::<Vec<_>>();
 
-        tracing::debug!("Computing proof indices and value mask");
-        let (proof_indices, value_mask) = compute_proof_indices_and_value_mask(&gindices);
-        tracing::debug!("Computing proof indices and value mask done");
+        let proof_indices = compute_proof_indices(&gindices);
 
-        tracing::debug!("Computing tree");
         let tree = container.compute_tree()?;
-        tracing::debug!("Computing tree done");
 
-        let nodes = proof_indices.par_iter();
         #[cfg(feature = "progress-bar")]
-        let nodes = nodes.progress_with(new_progress_bar(
-            "Computing proof nodes",
-            proof_indices.len(),
-        ));
-        let nodes: Vec<_> = nodes
+        let nodes: Vec<_> = proof_indices
+            .par_iter()
+            .progress_with(new_progress_bar(
+                "Computing proof nodes",
+                proof_indices.len(),
+            ))
             .map(|index| {
                 let mut prover = Prover::from(*index);
                 prover.compute_proof_cached_tree(container, &tree)?;
@@ -100,6 +95,33 @@ impl MultiproofBuilder {
                 Ok(proof.leaf)
             })
             .collect::<Result<Vec<_>>>()?;
+
+        #[cfg(not(feature = "progress-bar"))]
+        let nodes: Vec<_> = proof_indices
+            .par_iter()
+            .map(|index| {
+                let mut prover = Prover::from(*index);
+                prover.compute_proof_cached_tree(container, &tree)?;
+                let proof = prover.into_proof();
+                Ok(proof.leaf)
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        #[cfg(feature = "progress-bar")]
+        let value_mask: Vec<bool> = proof_indices
+            .par_iter()
+            .progress_with(new_progress_bar(
+                "Computing value mask",
+                proof_indices.len(),
+            ))
+            .map(|index| gindices.contains(index))
+            .collect();
+
+        #[cfg(not(feature = "progress-bar"))]
+        let value_mask: Vec<bool> = proof_indices
+            .par_iter()
+            .map(|index| gindices.contains(index))
+            .collect();
 
         let descriptor = compute_proof_descriptor(&gindices)?;
         let max_stack_depth = calculate_max_stack_depth(&descriptor);
@@ -139,35 +161,11 @@ fn compute_proof_indices(indices: &[GeneralizedIndex]) -> Vec<GeneralizedIndex> 
     sorted_indices
 }
 
-fn compute_proof_indices_and_value_mask(
-    indices: &[GeneralizedIndex],
-) -> (Vec<GeneralizedIndex>, Vec<bool>) {
-    let mut all_helper_indices = HashSet::new();
-    let mut all_path_indices = HashSet::new();
-
-    for index in indices {
-        all_helper_indices.extend(get_branch_indices(*index).iter());
-        all_path_indices.extend(get_path_indices(*index).iter());
-    }
-
-    let helper_indices = all_helper_indices
-        .difference(&all_path_indices)
-        .map(|a| (a, false));
-
-    let ind = helper_indices
-        .chain(indices.iter().map(|a| (a, true)))
-        .sorted_by_key(|(index, _)| format!("{:b}", index));
-
-    let (sorted_indices, value_mask) = ind.unzip();
-
-    (sorted_indices, value_mask)
-}
-
 fn compute_proof_descriptor(indices: &[GeneralizedIndex]) -> Result<Descriptor> {
     let indices = compute_proof_indices(indices);
     let mut descriptor = Descriptor::new();
     for index in indices {
-        descriptor.extend(std::iter::repeat_n(false, index.trailing_zeros() as usize));
+        descriptor.extend(std::iter::repeat(false).take(index.trailing_zeros() as usize));
         descriptor.push(true);
     }
     Ok(descriptor)
