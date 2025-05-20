@@ -15,8 +15,8 @@ ssz-multiproofs = { path = "../../../crates/ssz-multiproofs" }
 
 bitvec = { version = "1", features = ["serde"] }
 serde = "1.0.215"
-alloy-primitives = { version = "0.8", default-features = false, features = ["rlp", "serde", "std"] }
-alloy-sol-types = { version = "0.8" }
+alloy-primitives = { version = "1.0", default-features = false, features = ["rlp", "serde", "std"] }
+alloy-sol-types = { version = "1.0" }
 bincode = { version = "1.3" }
 
 risc0-zkvm = { version = "2.0", default-features = false, features = ['std', 'unstable'] }

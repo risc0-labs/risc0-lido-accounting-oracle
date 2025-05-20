@@ -46,7 +46,7 @@ pub fn main() {
     } = deserialize(&input_bytes).expect("Failed to deserialize input");
 
     // obtain the withdrawal vault balance from the EVM input
-    let env = evm_input.into_env().with_chain_spec(&ANVIL_CHAIN_SPEC);
+    let env = evm_input.into_env(&ANVIL_CHAIN_SPEC);
     let account = Account::new(WITHDRAWAL_VAULT_ADDRESS, &env);
     let withdrawal_vault_balance: U256 = account.info().balance;
 

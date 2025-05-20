@@ -5,14 +5,14 @@ edition = "2021"
 
 [features]
 default = []
-builder = ["ssz-multiproofs/builder", "dep:ssz_rs", "dep:ethereum-consensus", "dep:gindices", "dep:beacon-state"]
+builder = ["ssz-multiproofs/builder", "dep:ssz_rs", "dep:ethereum-consensus", "dep:gindices", "dep:beacon-state", "risc0-steel/host"]
 progress-bar = ["ssz-multiproofs/progress-bar"]
 sepolia = []
 
 [dependencies]
 ssz-multiproofs = { workspace = true }
 
-risc0-steel = { workspace = true }
+risc0-steel = { workspace = true, default-features = false }
 serde.workspace = true
 alloy-primitives.workspace = true
 alloy-sol-types.workspace = true

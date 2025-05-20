@@ -13,15 +13,16 @@ use ethereum_consensus::{
 // TODO(ec2): Remove all of this when electra is properly implemented in upstream ethereum-consensus
 
 pub mod mainnet {
-    use ethereum_consensus::{
-        electra::mainnet::{
-            BYTES_PER_LOGS_BLOOM, EPOCHS_PER_HISTORICAL_VECTOR, EPOCHS_PER_SLASHINGS_VECTOR,
-            ETH1_DATA_VOTES_BOUND, HISTORICAL_ROOTS_LIMIT, MAX_EXTRA_DATA_BYTES,
-            MAX_VALIDATORS_PER_COMMITTEE, PENDING_CONSOLIDATIONS_LIMIT, PENDING_DEPOSITS_LIMIT,
-            PENDING_PARTIAL_WITHDRAWALS_LIMIT, SLOTS_PER_HISTORICAL_ROOT, SYNC_COMMITTEE_SIZE,
-            VALIDATOR_REGISTRY_LIMIT,
-        },
-        phase0::mainnet::PENDING_ATTESTATIONS_BOUND,
+    use ethereum_consensus::altair::mainnet::SYNC_COMMITTEE_SIZE;
+    use ethereum_consensus::bellatrix::mainnet::{BYTES_PER_LOGS_BLOOM, MAX_EXTRA_DATA_BYTES};
+    use ethereum_consensus::electra::mainnet::{
+        PENDING_BALANCE_DEPOSITS_LIMIT, PENDING_CONSOLIDATIONS_LIMIT,
+        PENDING_PARTIAL_WITHDRAWALS_LIMIT,
+    };
+    use ethereum_consensus::phase0::mainnet::{
+        EPOCHS_PER_HISTORICAL_VECTOR, EPOCHS_PER_SLASHINGS_VECTOR, ETH1_DATA_VOTES_BOUND,
+        HISTORICAL_ROOTS_LIMIT, MAX_VALIDATORS_PER_COMMITTEE, PENDING_ATTESTATIONS_BOUND,
+        SLOTS_PER_HISTORICAL_ROOT, VALIDATOR_REGISTRY_LIMIT,
     };
     pub type BeaconState = super::BeaconState<
         SLOTS_PER_HISTORICAL_ROOT,
@@ -35,7 +36,7 @@ pub mod mainnet {
         SYNC_COMMITTEE_SIZE,
         BYTES_PER_LOGS_BLOOM,
         MAX_EXTRA_DATA_BYTES,
-        PENDING_DEPOSITS_LIMIT,
+        PENDING_BALANCE_DEPOSITS_LIMIT,
         PENDING_PARTIAL_WITHDRAWALS_LIMIT,
         PENDING_CONSOLIDATIONS_LIMIT,
     >;
@@ -50,7 +51,7 @@ pub mod mainnet {
         SYNC_COMMITTEE_SIZE,
         BYTES_PER_LOGS_BLOOM,
         MAX_EXTRA_DATA_BYTES,
-        PENDING_DEPOSITS_LIMIT,
+        PENDING_BALANCE_DEPOSITS_LIMIT,
         PENDING_PARTIAL_WITHDRAWALS_LIMIT,
         PENDING_CONSOLIDATIONS_LIMIT,
     >;

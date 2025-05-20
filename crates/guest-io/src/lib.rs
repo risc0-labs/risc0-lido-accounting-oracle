@@ -16,8 +16,11 @@ mod error;
 mod io;
 
 use alloy_primitives::{address, Address};
-use revm::primitives::SpecId;
-use risc0_steel::config::ChainSpec;
+use revm::primitives::hardfork::SpecId;
+use risc0_steel::config::{ChainSpec, ForkCondition};
+use risc0_steel::ethereum::EthChainSpec;
+pub use risc0_steel::ethereum::ETH_SEPOLIA_CHAIN_SPEC;
+use std::collections::BTreeMap;
 use std::sync::LazyLock;
 
 #[cfg(not(feature = "sepolia"))] // mainnet
@@ -38,11 +41,10 @@ pub const WITHDRAWAL_CREDENTIALS: alloy_primitives::B256 = alloy_primitives::B25
 #[cfg(feature = "sepolia")]
 pub const WITHDRAWAL_VAULT_ADDRESS: Address = address!("De7318Afa67eaD6d6bbC8224dfCe5ed6e4b86d76");
 
-pub static ANVIL_CHAIN_SPEC: LazyLock<ChainSpec> =
-    LazyLock::new(|| ChainSpec::new_single(31337, SpecId::CANCUN));
-
-pub static SEPOLIA_CHAIN_SPEC: LazyLock<ChainSpec> =
-    LazyLock::new(|| ChainSpec::new_single(11155111, SpecId::LATEST));
+pub static ANVIL_CHAIN_SPEC: LazyLock<EthChainSpec> = LazyLock::new(|| ChainSpec {
+    chain_id: 31337,
+    forks: BTreeMap::from([(SpecId::PRAGUE, ForkCondition::Timestamp(0))]),
+});
 
 pub use error::{Error, Result};
 pub use io::*;
