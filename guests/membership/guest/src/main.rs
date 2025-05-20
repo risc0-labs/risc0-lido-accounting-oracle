@@ -16,7 +16,7 @@ use std::usize;
 
 use bincode::deserialize;
 use bitvec::prelude::*;
-use gindices::presets::mainnet::beacon_state::{self as beacon_state_gindices};
+use gindices::presets::mainnet::beacon_state::post_electra as beacon_state_gindices;
 use gindices::presets::mainnet::historical_batch as historical_batch_gindices;
 use guest_io::validator_membership::{
     ContinuationType::{LongRange, SameSlot, ShortRange},

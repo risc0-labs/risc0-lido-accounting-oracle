@@ -82,10 +82,10 @@ mod tests {
         let provider = test_provider().await;
         let mut env = EthEvmEnv::builder()
             .provider(provider.clone())
+            .chain_spec(&ANVIL_CHAIN_SPEC)
             .build()
             .await
-            .unwrap()
-            .with_chain_spec(&ANVIL_CHAIN_SPEC);
+            .unwrap();
         let preflight_info = {
             let account = Account::preflight(WITHDRAWAL_VAULT_ADDRESS, &mut env);
             account.bytecode(true).info().await.unwrap()
@@ -94,7 +94,7 @@ mod tests {
 
         // Sanity check converting it back to an env as in the guest gives the same account info
         let input = env.into_input().await.unwrap();
-        let env = input.clone().into_env().with_chain_spec(&ANVIL_CHAIN_SPEC);
+        let env = input.clone().into_env(&ANVIL_CHAIN_SPEC);
         let info = {
             let account = Account::new(WITHDRAWAL_VAULT_ADDRESS, &env);
             account.bytecode(true).info()
@@ -112,7 +112,7 @@ mod tests {
         println!("program execution returned: {:?}", session_info.journal);
         println!("total cycles: {}", session_info.cycles());
 
-        let journal = Journal::abi_decode(&session_info.journal.bytes, true).unwrap();
+        let journal = Journal::abi_decode(&session_info.journal.bytes).unwrap();
         assert_eq!(
             journal.withdrawalVaultBalanceWei,
             parse_ether("33").unwrap(),

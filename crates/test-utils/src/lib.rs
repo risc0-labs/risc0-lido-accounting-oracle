@@ -1,18 +1,19 @@
+use beacon_state::mainnet::ElectraBeaconState;
 use ethereum_consensus::capella::presets::mainnet::{
-    BeaconState, HistoricalBatch, HistoricalSummary, Validator,
+    HistoricalBatch, HistoricalSummary, Validator,
 };
 use ethereum_consensus::ssz::prelude::*;
 use gindices::presets::mainnet::beacon_state::{CAPELLA_FORK_SLOT, SLOTS_PER_HISTORICAL_ROOT};
 use guest_io::WITHDRAWAL_CREDENTIALS;
 
 pub struct TestStateBuilder {
-    inner: BeaconState,
+    inner: ElectraBeaconState,
 }
 
 impl TestStateBuilder {
     pub fn new(slot: u64) -> Self {
         Self {
-            inner: BeaconState {
+            inner: ElectraBeaconState {
                 slot,
                 ..Default::default()
             },
@@ -38,7 +39,7 @@ impl TestStateBuilder {
 
     pub fn with_prior_state(
         &mut self,
-        prior_state: &ethereum_consensus::types::mainnet::BeaconState,
+        prior_state: &beacon_state::mainnet::BeaconState,
     ) -> Option<HistoricalBatch> {
         let slot = self.inner.slot;
         let prior_slot = prior_state.slot();
@@ -66,7 +67,7 @@ impl TestStateBuilder {
         }
     }
 
-    pub fn build(self) -> ethereum_consensus::types::mainnet::BeaconState {
-        ethereum_consensus::types::mainnet::BeaconState::Capella(self.inner)
+    pub fn build(self) -> beacon_state::mainnet::BeaconState {
+        beacon_state::mainnet::BeaconState::Electra(self.inner)
     }
 }

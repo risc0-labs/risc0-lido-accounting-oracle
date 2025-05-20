@@ -12,11 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use beacon_state::mainnet::BeaconState;
 use ethereum_consensus::{
-    phase0::SignedBeaconBlockHeader,
-    primitives::Root,
-    types::mainnet::{BeaconBlock, BeaconState},
-    Fork,
+    phase0::SignedBeaconBlockHeader, primitives::Root, types::mainnet::BeaconBlock, Fork,
 };
 use http_cache_reqwest::{CACacheManager, Cache, CacheMode, HttpCache, HttpCacheOptions};
 use reqwest::IntoUrl;
@@ -134,6 +132,12 @@ impl BeaconClient {
         let path = format!("eth/v2/debug/beacon/states/{state_id}");
         let result: VersionedResponse<BeaconState> = self.http_get(&path).await?;
         if result.version.to_string() != result.inner.data.version().to_string() {
+            tracing::warn!(
+                "FORK: {:?}, Version mismatch: {} != {}",
+                result.inner.data.fork(),
+                result.version,
+                result.inner.data.version()
+            );
             return Err(Error::VersionMismatch);
         }
         Ok(result.inner.data)

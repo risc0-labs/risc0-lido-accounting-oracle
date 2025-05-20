@@ -18,12 +18,12 @@ use bincode::deserialize;
 use bitvec::prelude::*;
 use bitvec::vec::BitVec;
 use gindices::presets::mainnet::beacon_block as beacon_block_gindices;
-use gindices::presets::mainnet::beacon_state as beacon_state_gindices;
+use gindices::presets::mainnet::beacon_state::post_electra as beacon_state_gindices;
 use guest_io::balance_and_exits::{Input, Journal};
 use guest_io::validator_membership::Journal as MembershipJounal;
-use guest_io::ANVIL_CHAIN_SPEC;
 use guest_io::{InputWithReceipt, WITHDRAWAL_VAULT_ADDRESS};
 use membership_builder::VALIDATOR_MEMBERSHIP_ID;
+use risc0_steel::ethereum::ETH_SEPOLIA_CHAIN_SPEC;
 use risc0_steel::Account;
 use risc0_zkvm::guest::env;
 use risc0_zkvm::Receipt;
@@ -46,7 +46,7 @@ pub fn main() {
     } = deserialize(&input_bytes).expect("Failed to deserialize input");
 
     // obtain the withdrawal vault balance from the EVM input
-    let env = evm_input.into_env().with_chain_spec(&ANVIL_CHAIN_SPEC);
+    let env = evm_input.into_env(&ETH_SEPOLIA_CHAIN_SPEC);
     let account = Account::new(WITHDRAWAL_VAULT_ADDRESS, &env);
     let withdrawal_vault_balance: U256 = account.info().balance;
 

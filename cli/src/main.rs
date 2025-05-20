@@ -23,7 +23,7 @@ use balance_and_exits_builder::{BALANCE_AND_EXITS_ELF, BALANCE_AND_EXITS_ID};
 use beacon_client::BeaconClient;
 use clap::Parser;
 use ethereum_consensus::phase0::mainnet::{HistoricalBatch, SLOTS_PER_HISTORICAL_ROOT};
-use guest_io::{WITHDRAWAL_CREDENTIALS, WITHDRAWAL_VAULT_ADDRESS};
+use guest_io::{ETH_SEPOLIA_CHAIN_SPEC, WITHDRAWAL_CREDENTIALS, WITHDRAWAL_VAULT_ADDRESS};
 use membership_builder::{VALIDATOR_MEMBERSHIP_ELF, VALIDATOR_MEMBERSHIP_ID};
 use risc0_ethereum_contracts::encode_seal;
 use risc0_steel::{ethereum::EthEvmEnv, Account};
@@ -415,6 +415,7 @@ async fn build_aggregate_input<'a>(
     let block = beacon_client.get_block(slot).await?;
 
     let mut env = EthEvmEnv::builder()
+        .chain_spec(&ETH_SEPOLIA_CHAIN_SPEC)
         .rpc(eth_rpc_url)
         .beacon_api(beacon_rpc_url)
         .block_number(block.body().execution_payload().unwrap().block_number())
@@ -471,7 +472,9 @@ async fn submit_aggregate_proof(
     in_path: PathBuf,
 ) -> Result<()> {
     let wallet = EthereumWallet::from(eth_wallet_private_key);
-    let provider = ProviderBuilder::new().wallet(wallet).on_http(eth_rpc_url);
+    let provider = ProviderBuilder::new()
+        .wallet(wallet)
+        .connect_http(eth_rpc_url);
 
     let proof: AggregateProof = bincode::deserialize(&read(in_path)?)?;
     tracing::info!("verifying locally for sanity check");
@@ -483,7 +486,7 @@ async fn submit_aggregate_proof(
     if let Some(test_contract) = test_contract {
         let contract = ITestVerifier::new(test_contract, provider.clone());
         let block_root = proof.receipt.journal.bytes[..32].try_into()?;
-        let report = TestReport::abi_decode(&proof.receipt.journal.bytes[32..], true)?;
+        let report = TestReport::abi_decode(&proof.receipt.journal.bytes[32..])?;
         let call_builder = contract.verify(block_root, report, seal.clone().into());
         let pending_tx = call_builder.send().await?;
         tracing::info!(
@@ -497,8 +500,8 @@ async fn submit_aggregate_proof(
     if let Some(contract) = contract {
         let contract = IOracleProofReceiver::new(contract, provider.clone());
         // skip the first 32 bytes of the journal as that is the beacon block hash which is not part of the report
-        let report = Report::abi_decode(&proof.receipt.journal.bytes[32..], true)?;
-        let commitment = Commitment::abi_decode(&proof.receipt.journal.bytes[32 + 32..], true)?; // TODO: This is garbage
+        let report = Report::abi_decode(&proof.receipt.journal.bytes[32..])?;
+        let commitment = Commitment::abi_decode(&proof.receipt.journal.bytes[32 + 32..])?; // TODO: This is garbage
         let call_builder = contract.update(
             proof.slot.try_into()?,
             report,
