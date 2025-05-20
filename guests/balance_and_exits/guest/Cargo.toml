@@ -5,7 +5,7 @@ edition = "2021"
 [workspace]
 
 [features]
-sepolia = ["guest-io/sepolia"]
+sepolia = ["guest-io/sepolia", "membership_builder/sepolia"]
 skip-verify = []
 
 [dependencies]

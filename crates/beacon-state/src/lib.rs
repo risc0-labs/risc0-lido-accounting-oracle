@@ -65,7 +65,6 @@ mod electra {
     use ethereum_consensus::{
         altair::SyncCommittee,
         capella::HistoricalSummary,
-        deneb::ExecutionPayloadHeader,
         phase0::{
             BeaconBlockHeader, Checkpoint, Eth1Data, Fork, Validator, JUSTIFICATION_BITS_LENGTH,
         },
