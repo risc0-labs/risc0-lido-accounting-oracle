@@ -472,7 +472,9 @@ async fn submit_aggregate_proof(
     in_path: PathBuf,
 ) -> Result<()> {
     let wallet = EthereumWallet::from(eth_wallet_private_key);
-    let provider = ProviderBuilder::new().wallet(wallet).on_http(eth_rpc_url);
+    let provider = ProviderBuilder::new()
+        .wallet(wallet)
+        .connect_http(eth_rpc_url);
 
     let proof: AggregateProof = bincode::deserialize(&read(in_path)?)?;
     tracing::info!("verifying locally for sanity check");

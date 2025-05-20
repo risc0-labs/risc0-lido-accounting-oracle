@@ -11,3 +11,4 @@ gindices.workspace = true
 bitvec = { workspace = true }
 ethereum-consensus = { workspace = true }
 anyhow = { workspace = true }
+beacon-state = { workspace = true }

@@ -58,9 +58,8 @@ pub mod mainnet {
 }
 
 mod electra {
-    use ethereum_consensus::electra::{
-        DepositReceipt, PendingConsolidation, PendingPartialWithdrawal,
-    };
+    use ethereum_consensus::crypto::{PublicKey as BlsPublicKey, Signature as BlsSignature};
+    use ethereum_consensus::electra::PendingConsolidation;
     use ethereum_consensus::serde::{as_str, seq_of_str};
     use ethereum_consensus::{
         altair::SyncCommittee,
@@ -73,6 +72,33 @@ mod electra {
         },
     };
     use ssz_rs::prelude::*;
+
+    #[derive(
+        Default, Debug, Clone, SimpleSerialize, PartialEq, Eq, serde::Serialize, serde::Deserialize,
+    )]
+    pub struct PendingDeposit {
+        #[serde(rename = "pubkey")]
+        pub public_key: BlsPublicKey,
+        pub withdrawal_credentials: Bytes32,
+        #[serde(with = "as_str")]
+        pub amount: Gwei,
+        pub signature: BlsSignature,
+        #[serde(with = "as_str")]
+        slot: Slot,
+    }
+
+    #[derive(
+        Default, Debug, Clone, SimpleSerialize, PartialEq, Eq, serde::Serialize, serde::Deserialize,
+    )]
+    pub struct PendingPartialWithdrawal {
+        #[serde(with = "as_str")]
+        pub validator_index: ValidatorIndex,
+        #[serde(with = "as_str")]
+        pub amount: Gwei,
+        #[serde(with = "as_str")]
+        pub withdrawable_epoch: Epoch,
+    }
+
     #[derive(
         Default, Debug, SimpleSerialize, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize,
     )]
@@ -146,7 +172,7 @@ mod electra {
         pub consolidation_balance_to_consume: Gwei,
         #[serde(with = "as_str")]
         pub earliest_consolidation_epoch: Epoch,
-        pub pending_deposits: List<DepositReceipt, PENDING_DEPOSITS_LIMIT>,
+        pub pending_deposits: List<PendingDeposit, PENDING_DEPOSITS_LIMIT>,
         pub pending_partial_withdrawals:
             List<PendingPartialWithdrawal, PENDING_PARTIAL_WITHDRAWALS_LIMIT>,
         pub pending_consolidations: List<PendingConsolidation, PENDING_CONSOLIDATIONS_LIMIT>,

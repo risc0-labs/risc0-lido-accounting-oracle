@@ -7001,6 +7001,7 @@ dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
  "anyhow",
+ "beacon-state",
  "bitvec",
  "ethereum-consensus",
  "gindices",

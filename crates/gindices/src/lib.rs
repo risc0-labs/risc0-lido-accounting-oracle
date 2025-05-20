@@ -107,7 +107,7 @@ mod test {
     #[test]
     fn block_state_root() -> anyhow::Result<()> {
         assert_eq!(
-            ethereum_consensus::electra::presets::mainnet::BeaconBlock::generalized_index(&[
+            ethereum_consensus::capella::presets::mainnet::BeaconBlock::generalized_index(&[
                 "state_root".into(),
             ])? as u64,
             presets::mainnet::beacon_block::state_root()
@@ -118,7 +118,7 @@ mod test {
     #[test]
     fn block_slot() -> anyhow::Result<()> {
         assert_eq!(
-            ethereum_consensus::electra::presets::mainnet::BeaconBlock::generalized_index(&[
+            ethereum_consensus::capella::presets::mainnet::BeaconBlock::generalized_index(&[
                 "slot".into(),
             ])? as u64,
             presets::mainnet::beacon_block::slot()
@@ -223,7 +223,7 @@ mod test {
 
     mod post_electra {
         use super::*;
-        use ethereum_consensus::electra::presets::mainnet::BeaconState;
+        use beacon_state::mainnet::ElectraBeaconState as BeaconState;
 
         #[test]
         fn slot() -> anyhow::Result<()> {

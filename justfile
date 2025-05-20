@@ -1,8 +1,12 @@
 set dotenv-load := true
 
 build:
-    cargo build --release --features sepolia
-
+    #!/usr/bin/env -S bash -x
+    if [[ "${ETH_NETWORK}" == "sepolia" ]]; then
+        cargo build --release --features sepolia
+    else
+        cargo build --release
+    fi
 
 ## Input building tasks
 
