@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["cli", "guests/membership", "guests/balance_and_exits", "crates/ssz-multiproofs", "crates/gindices", "crates/guest-io", "crates/tracing-risc0", "crates/test-utils", "crates/beacon-state"]
+members = ["cli", "guests/membership", "guests/balance_and_exits", "crates/ssz-multiproofs", "crates/gindices", "crates/guest-io", "crates/test-utils", "crates/beacon-state"]
 
 [workspace.package]
 version = "0.1.0"

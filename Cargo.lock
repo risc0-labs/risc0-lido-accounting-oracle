@@ -7355,16 +7355,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tracing-risc0"
-version = "0.1.0"
-dependencies = [
- "risc0-zkvm",
- "risc0-zkvm-platform",
- "tracing",
- "tracing-subscriber 0.3.19",
-]
-
-[[package]]
 name = "tracing-subscriber"
 version = "0.2.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"

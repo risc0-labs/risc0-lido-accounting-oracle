@@ -65,7 +65,7 @@ mod electra {
     use ethereum_consensus::{
         altair::SyncCommittee,
         capella::HistoricalSummary,
-        electra::ExecutionPayloadHeader,
+        deneb::ExecutionPayloadHeader,
         phase0::{
             BeaconBlockHeader, Checkpoint, Eth1Data, Fork, Validator, JUSTIFICATION_BITS_LENGTH,
         },
@@ -124,8 +124,12 @@ mod electra {
         pub inactivity_scores: List<u64, VALIDATOR_REGISTRY_LIMIT>,
         pub current_sync_committee: SyncCommittee<SYNC_COMMITTEE_SIZE>,
         pub next_sync_committee: SyncCommittee<SYNC_COMMITTEE_SIZE>,
-        pub latest_execution_payload_header:
-            ExecutionPayloadHeader<BYTES_PER_LOGS_BLOOM, MAX_EXTRA_DATA_BYTES>,
+        // Note this is using a different container than the spec. This is to support deserialization from the beacon API
+        // from quicknode which is returning Daneb format containers for this field for some reason..
+        pub latest_execution_payload_header: ethereum_consensus::deneb::ExecutionPayloadHeader<
+            BYTES_PER_LOGS_BLOOM,
+            MAX_EXTRA_DATA_BYTES,
+        >,
         #[serde(with = "as_str")]
         pub next_withdrawal_index: WithdrawalIndex,
         #[serde(with = "as_str")]
@@ -564,8 +568,13 @@ impl<
         D: serde::Deserializer<'de>,
     {
         let value = serde_json::Value::deserialize(deserializer)?;
-        if let Ok(inner) = <_ as serde::Deserialize>::deserialize(&value) {
-            return Ok(Self::Electra(inner));
+        match <_ as serde::Deserialize>::deserialize(&value) {
+            Ok(inner) => {
+                return Ok(Self::Electra(inner));
+            }
+            Err(e) => {
+                eprintln!("Failed to deserialize Electra: {:?}", e);
+            }
         }
         if let Ok(inner) = <_ as serde::Deserialize>::deserialize(&value) {
             return Ok(Self::Deneb(inner));
