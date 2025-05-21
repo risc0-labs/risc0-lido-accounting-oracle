@@ -24,7 +24,7 @@ fn test_proving_validator_fields() {
     let builder = MultiproofBuilder::new();
     let multiproof = builder
         .with_path::<BeaconState>(&["validators".into()])
-        .build(&beacon_state)
+        .build(&beacon_state, Option::<(usize, BeaconState)>::None)
         .unwrap();
 
     let serialized = to_stdvec(&multiproof).unwrap();
@@ -47,7 +47,51 @@ fn test_proving_validator_fields() {
 
     let multiproof = MultiproofBuilder::new()
         .with_gindex(gindex)
-        .build(&beacon_state)
+        .build(&beacon_state, Option::<(usize, BeaconState)>::None)
+        .unwrap();
+
+    let serialized = to_stdvec(&multiproof).unwrap();
+    let multiproof: Multiproof = from_bytes(&serialized).unwrap();
+
+    multiproof
+        .verify(&beacon_state.hash_tree_root().unwrap())
+        .unwrap();
+
+    assert_eq!(
+        multiproof.values::<32>().next(),
+        Some((
+            gindex as u64,
+            beacon_state.validators[0]
+                .withdrawal_credentials
+                .as_slice()
+                .try_into()
+                .unwrap()
+        ))
+    );
+}
+
+#[test]
+fn test_proving_validator_fields_with_pivot() {
+    // Add a validator to the state
+    let mut beacon_state = BeaconState::default();
+    beacon_state.validators.push(Default::default());
+
+    let gindex = BeaconState::generalized_index(&[
+        "validators".into(),
+        0.into(),
+        "withdrawal_credentials".into(),
+    ])
+    .expect("Invalid path");
+
+    let multiproof = MultiproofBuilder::new()
+        .with_gindex(gindex)
+        .build(
+            &beacon_state,
+            Some((
+                BeaconState::generalized_index(&["validators".into()]).unwrap(),
+                beacon_state.validators.clone(),
+            )),
+        )
         .unwrap();
 
     let serialized = to_stdvec(&multiproof).unwrap();
@@ -79,7 +123,7 @@ fn test_proving_state_roots() {
 
     let multiproof = MultiproofBuilder::new()
         .with_gindex(gindex)
-        .build(&beacon_state)
+        .build(&beacon_state, Option::<(usize, BeaconState)>::None)
         .unwrap();
 
     let serialized = to_stdvec(&multiproof).unwrap();

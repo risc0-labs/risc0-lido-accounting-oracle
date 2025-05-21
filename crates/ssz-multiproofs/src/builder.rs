@@ -73,8 +73,12 @@ impl MultiproofBuilder {
     }
 
     /// Build the multi-proof for a given container
-    #[tracing::instrument(skip(self, container))]
-    pub fn build<T: Prove + Sync>(self, container: &T) -> Result<Multiproof<'static>> {
+    #[tracing::instrument(skip(self, container, pivot))]
+    pub fn build<T: Prove + Sync>(
+        self,
+        container: &T,
+        pivot: Option<(GeneralizedIndex, impl Prove + Sync + Send)>,
+    ) -> Result<Multiproof<'static>> {
         let gindices = self.gindices.into_iter().collect::<Vec<_>>();
 
         let proof_indices = compute_proof_indices(&gindices);
@@ -89,6 +93,20 @@ impl MultiproofBuilder {
                 proof_indices.len(),
             ))
             .map(|index| {
+                if let Some((pivot_gindex, pivot_container)) = &pivot {
+                    if let Some(pivot_relative_index) =
+                        to_ancestor_relative_gindex(*pivot_gindex, *index)
+                    {
+                        tracing::debug!(
+                            "Using pivot gindex {pivot_gindex} for index {index} with relative index {pivot_relative_index}"
+                        );
+                        let mut prover = Prover::from(pivot_relative_index);
+                        prover.compute_proof(pivot_container)?;
+                        let proof = prover.into_proof();
+                        return Ok(proof.leaf);
+                    }
+                }
+
                 let mut prover = Prover::from(*index);
                 prover.compute_proof_cached_tree(container, &tree)?;
                 let proof = prover.into_proof();
@@ -100,6 +118,20 @@ impl MultiproofBuilder {
         let nodes: Vec<_> = proof_indices
             .par_iter()
             .map(|index| {
+                if let Some((pivot_gindex, pivot_container)) = &pivot {
+                    if let Some(pivot_relative_index) =
+                        to_ancestor_relative_gindex(*pivot_gindex, *index)
+                    {
+                        tracing::debug!(
+                            "Using pivot gindex {pivot_gindex} for index {index} with relative index {pivot_relative_index}"
+                        );
+                        let mut prover = Prover::from(pivot_relative_index);
+                        prover.compute_proof(pivot_container)?;
+                        let proof = prover.into_proof();
+                        return Ok(proof.leaf);
+                    }
+                }
+
                 let mut prover = Prover::from(*index);
                 prover.compute_proof_cached_tree(container, &tree)?;
                 let proof = prover.into_proof();
@@ -217,6 +249,28 @@ const fn parent(index: GeneralizedIndex) -> GeneralizedIndex {
     index / 2
 }
 
+fn to_ancestor_relative_gindex(
+    maybe_ancestor: GeneralizedIndex,
+    child: GeneralizedIndex,
+) -> Option<GeneralizedIndex> {
+    let maybe_ancestor_bin = format!("{:b}", maybe_ancestor);
+    let child_bin = format!("{:b}", child);
+
+    if child_bin.starts_with(&maybe_ancestor_bin) {
+        // Replace the matching prefix with '1'
+        let mut new_bin = String::from("1");
+        new_bin.push_str(&child_bin[maybe_ancestor_bin.len()..]);
+        // Parse the new binary string back to a GeneralizedIndex
+        if let Ok(new_gindex) = usize::from_str_radix(&new_bin, 2) {
+            Some(new_gindex)
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
 #[cfg(feature = "progress-bar")]
 fn new_progress_bar(msg: &'static str, len: usize) -> ProgressBar {
     let pb_style = ProgressStyle::with_template(
@@ -227,4 +281,24 @@ fn new_progress_bar(msg: &'static str, len: usize) -> ProgressBar {
     pb.set_message(msg);
     pb.set_style(pb_style);
     pb
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_ancestor() {
+        let ancestor = 0b1100;
+        let child = 0b110000;
+        assert_eq!(to_ancestor_relative_gindex(ancestor, child), Some(0b100));
+
+        let ancestor = 0b1101;
+        let child = 0b110000;
+        assert!(to_ancestor_relative_gindex(ancestor, child).is_none());
+
+        let ancestor = 0b1100;
+        let child = 0b111000;
+        assert!(to_ancestor_relative_gindex(ancestor, child).is_none());
+    }
 }
