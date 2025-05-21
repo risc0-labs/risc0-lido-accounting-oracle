@@ -6,6 +6,7 @@ edition = "2021"
 
 [features]
 sepolia = ["guest-io/sepolia", "membership_builder/sepolia"]
+anvil = []
 skip-verify = []
 
 [dependencies]

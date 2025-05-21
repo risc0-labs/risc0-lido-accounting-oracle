@@ -14,8 +14,6 @@
 
 use crate::multiproof::{calculate_max_stack_depth, Multiproof};
 use crate::{Descriptor, Result};
-#[cfg(feature = "progress-bar")]
-use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use ssz_rs::prelude::{GeneralizedIndex, GeneralizedIndexable, Path, Prove};
 use ssz_rs::proofs::Prover;
@@ -79,21 +77,23 @@ impl MultiproofBuilder {
         container: &T,
         pivot: Option<(GeneralizedIndex, impl Prove + Sync + Send)>,
     ) -> Result<Multiproof<'static>> {
-        let gindices = self.gindices.into_iter().collect::<Vec<_>>();
+        let mut gindices = self.gindices.into_iter().collect::<Vec<_>>();
 
         let proof_indices = compute_proof_indices(&gindices);
 
         let tree = container.compute_tree()?;
+        let pivot = pivot
+            .map(|(pivot_gindex, pivot_container)| {
+                pivot_container
+                    .compute_tree()
+                    .map(|tree| (pivot_gindex, pivot_container, tree))
+            })
+            .transpose()?;
 
-        #[cfg(feature = "progress-bar")]
         let nodes: Vec<_> = proof_indices
             .par_iter()
-            .progress_with(new_progress_bar(
-                "Computing proof nodes",
-                proof_indices.len(),
-            ))
             .map(|index| {
-                if let Some((pivot_gindex, pivot_container)) = &pivot {
+                if let Some((pivot_gindex, pivot_container, tree)) = &pivot {
                     if let Some(pivot_relative_index) =
                         to_ancestor_relative_gindex(*pivot_gindex, *index)
                     {
@@ -101,7 +101,7 @@ impl MultiproofBuilder {
                             "Using pivot gindex {pivot_gindex} for index {index} with relative index {pivot_relative_index}"
                         );
                         let mut prover = Prover::from(pivot_relative_index);
-                        prover.compute_proof(pivot_container)?;
+                        prover.compute_proof_cached_tree(pivot_container, tree)?;
                         let proof = prover.into_proof();
                         return Ok(proof.leaf);
                     }
@@ -114,45 +114,11 @@ impl MultiproofBuilder {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        #[cfg(not(feature = "progress-bar"))]
-        let nodes: Vec<_> = proof_indices
-            .par_iter()
-            .map(|index| {
-                if let Some((pivot_gindex, pivot_container)) = &pivot {
-                    if let Some(pivot_relative_index) =
-                        to_ancestor_relative_gindex(*pivot_gindex, *index)
-                    {
-                        tracing::debug!(
-                            "Using pivot gindex {pivot_gindex} for index {index} with relative index {pivot_relative_index}"
-                        );
-                        let mut prover = Prover::from(pivot_relative_index);
-                        prover.compute_proof(pivot_container)?;
-                        let proof = prover.into_proof();
-                        return Ok(proof.leaf);
-                    }
-                }
+        gindices.sort_unstable();
 
-                let mut prover = Prover::from(*index);
-                prover.compute_proof_cached_tree(container, &tree)?;
-                let proof = prover.into_proof();
-                Ok(proof.leaf)
-            })
-            .collect::<Result<Vec<_>>>()?;
-
-        #[cfg(feature = "progress-bar")]
         let value_mask: Vec<bool> = proof_indices
             .par_iter()
-            .progress_with(new_progress_bar(
-                "Computing value mask",
-                proof_indices.len(),
-            ))
-            .map(|index| gindices.contains(index))
-            .collect();
-
-        #[cfg(not(feature = "progress-bar"))]
-        let value_mask: Vec<bool> = proof_indices
-            .par_iter()
-            .map(|index| gindices.contains(index))
+            .map(|index| gindices.binary_search(index).is_ok())
             .collect();
 
         let descriptor = compute_proof_descriptor(&proof_indices)?;
@@ -249,38 +215,31 @@ const fn parent(index: GeneralizedIndex) -> GeneralizedIndex {
     index / 2
 }
 
+/// Replaces the common binary prefix of `child` with a `1`
+/// if `maybe_ancestor` is a prefix of `child` in binary representation.
 fn to_ancestor_relative_gindex(
     maybe_ancestor: GeneralizedIndex,
     child: GeneralizedIndex,
 ) -> Option<GeneralizedIndex> {
-    let maybe_ancestor_bin = format!("{:b}", maybe_ancestor);
-    let child_bin = format!("{:b}", child);
+    if maybe_ancestor == 0 || child <= maybe_ancestor {
+        return None;
+    }
 
-    if child_bin.starts_with(&maybe_ancestor_bin) {
-        // Replace the matching prefix with '1'
-        let mut new_bin = String::from("1");
-        new_bin.push_str(&child_bin[maybe_ancestor_bin.len()..]);
-        // Parse the new binary string back to a GeneralizedIndex
-        if let Ok(new_gindex) = usize::from_str_radix(&new_bin, 2) {
-            Some(new_gindex)
-        } else {
-            None
-        }
+    // Count the number of bits (excluding leading zeros)
+    let ancestor_bits = usize::BITS - maybe_ancestor.leading_zeros();
+    let child_bits = usize::BITS - child.leading_zeros();
+
+    // Check if maybe_ancestor is a prefix of child in binary
+    let shift = child_bits - ancestor_bits;
+    if (child >> shift) == maybe_ancestor {
+        // Strip the prefix and insert a leading 1
+        let suffix_mask = (1 << shift) - 1;
+        let suffix = child & suffix_mask;
+        let new_gindex = (1 << shift) | suffix;
+        Some(new_gindex)
     } else {
         None
     }
-}
-
-#[cfg(feature = "progress-bar")]
-fn new_progress_bar(msg: &'static str, len: usize) -> ProgressBar {
-    let pb_style = ProgressStyle::with_template(
-        "{msg} {spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] ({pos}/{len}, ETA {eta})",
-    )
-    .unwrap();
-    let pb = ProgressBar::new(len as u64);
-    pb.set_message(msg);
-    pb.set_style(pb_style);
-    pb
 }
 
 #[cfg(test)]

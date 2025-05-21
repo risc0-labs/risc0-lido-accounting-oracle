@@ -1,10 +1,12 @@
 set dotenv-load := true
 
 build:
-    #!/usr/bin/env -S bash -x
+    #!/usr/bin/env bash
     if [[ "${ETH_NETWORK}" == "sepolia" ]]; then
+        echo "Building for Sepolia network"
         cargo build --release --features sepolia
     else
+        echo "Building for main network"
         cargo build --release
     fi
 

@@ -9,7 +9,7 @@ sepolia = ["guest-io/sepolia", "membership_builder/sepolia"]
 
 [dependencies]
 ssz-multiproofs.workspace = true
-guest-io = { workspace = true, features = ["builder", "progress-bar"] }
+guest-io = { workspace = true, features = ["builder"] }
 membership_builder.workspace = true
 balance_and_exits_builder.workspace = true
 beacon-state = { workspace = true }

@@ -144,7 +144,7 @@ pub mod validator_membership {
                 );
                 let hist_summary_multiproof = MultiproofBuilder::new()
                     .with_gindex(historical_batch_gindices::state_roots(prior_slot).try_into()?)
-                    .build(&historical_batch)?;
+                    .build(&historical_batch, Option::<(_, usize)>::None)?;
                 (ContinuationType::LongRange, Some(hist_summary_multiproof))
             } else {
                 return Err(Error::MissingHistoricalBatch);
@@ -278,7 +278,7 @@ pub mod balance_and_exits {
             let block_multiproof = MultiproofBuilder::new()
                 .with_gindex(beacon_block_gindices::slot().try_into()?)
                 .with_gindex(beacon_block_gindices::state_root().try_into()?)
-                .build(block_header)?;
+                .build(block_header, Option::<(_, usize)>::None)?;
 
             let state_multiproof_builder = MultiproofBuilder::new()
                 .with_gindex(beacon_state_gindices::validator_count().try_into()?)
@@ -330,12 +330,50 @@ fn build_with_versioned_state(
     builder: MultiproofBuilder,
     beacon_state: &BeaconState,
 ) -> Result<Multiproof<'static>> {
+    use beacon_state::mainnet::ElectraBeaconState;
+
     match beacon_state {
-        BeaconState::Phase0(b) => Ok(builder.build(b)?),
-        BeaconState::Altair(b) => Ok(builder.build(b)?),
-        BeaconState::Bellatrix(b) => Ok(builder.build(b)?),
-        BeaconState::Capella(b) => Ok(builder.build(b)?),
-        BeaconState::Deneb(b) => Ok(builder.build(b)?),
-        BeaconState::Electra(b) => Ok(builder.build(b)?),
+        BeaconState::Phase0(b) => Ok(builder.build(
+            b,
+            Some((
+                BeaconState::generalized_index(&["validators".into()]).unwrap(),
+                beacon_state.validators().clone(),
+            )),
+        )?),
+        BeaconState::Altair(b) => Ok(builder.build(
+            b,
+            Some((
+                BeaconState::generalized_index(&["validators".into()]).unwrap(),
+                beacon_state.validators().clone(),
+            )),
+        )?),
+        BeaconState::Bellatrix(b) => Ok(builder.build(
+            b,
+            Some((
+                BeaconState::generalized_index(&["validators".into()]).unwrap(),
+                beacon_state.validators().clone(),
+            )),
+        )?),
+        BeaconState::Capella(b) => Ok(builder.build(
+            b,
+            Some((
+                BeaconState::generalized_index(&["validators".into()]).unwrap(),
+                beacon_state.validators().clone(),
+            )),
+        )?),
+        BeaconState::Deneb(b) => Ok(builder.build(
+            b,
+            Some((
+                BeaconState::generalized_index(&["validators".into()]).unwrap(),
+                beacon_state.validators().clone(),
+            )),
+        )?),
+        BeaconState::Electra(b) => Ok(builder.build(
+            b,
+            Some((
+                ElectraBeaconState::generalized_index(&["validators".into()]).unwrap(),
+                beacon_state.validators().clone(),
+            )),
+        )?),
     }
 }
