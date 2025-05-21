@@ -123,7 +123,7 @@ impl MultiproofBuilder {
             .map(|index| gindices.contains(index))
             .collect();
 
-        let descriptor = compute_proof_descriptor(&gindices)?;
+        let descriptor = compute_proof_descriptor(&proof_indices)?;
         let max_stack_depth = calculate_max_stack_depth(&descriptor);
 
         let data: Vec<u8> = nodes
@@ -161,10 +161,9 @@ fn compute_proof_indices(indices: &[GeneralizedIndex]) -> Vec<GeneralizedIndex> 
     sorted_indices
 }
 
-fn compute_proof_descriptor(indices: &[GeneralizedIndex]) -> Result<Descriptor> {
-    let indices = compute_proof_indices(indices);
+fn compute_proof_descriptor(proof_indices: &[GeneralizedIndex]) -> Result<Descriptor> {
     let mut descriptor = Descriptor::new();
-    for index in indices {
+    for index in proof_indices {
         descriptor.extend(std::iter::repeat(false).take(index.trailing_zeros() as usize));
         descriptor.push(true);
     }
