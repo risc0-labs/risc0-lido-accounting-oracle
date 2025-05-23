@@ -14,6 +14,7 @@
 
 use crate::multiproof::{calculate_max_stack_depth, Multiproof};
 use crate::{Descriptor, Result};
+use itertools::Itertools;
 use rayon::prelude::*;
 use ssz_rs::prelude::{GeneralizedIndex, GeneralizedIndexable, Path, Prove};
 use ssz_rs::proofs::Prover;
@@ -77,9 +78,9 @@ impl MultiproofBuilder {
         container: &T,
         pivot: Option<(GeneralizedIndex, impl Prove + Sync + Send)>,
     ) -> Result<Multiproof<'static>> {
-        let mut gindices = self.gindices.into_iter().collect::<Vec<_>>();
+        let gindices = self.gindices.into_iter().collect::<Vec<_>>();
 
-        let proof_indices = compute_proof_indices(&gindices);
+        let (proof_indices, value_mask) = compute_proof_indices_and_value_mask(&gindices);
 
         let tree = container.compute_tree()?;
         let pivot = pivot
@@ -114,13 +115,6 @@ impl MultiproofBuilder {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        gindices.sort_unstable();
-
-        let value_mask: Vec<bool> = proof_indices
-            .par_iter()
-            .map(|index| gindices.binary_search(index).is_ok())
-            .collect();
-
         let descriptor = compute_proof_descriptor(&proof_indices)?;
         let max_stack_depth = calculate_max_stack_depth(&descriptor);
 
@@ -139,24 +133,62 @@ impl MultiproofBuilder {
     }
 }
 
-fn compute_proof_indices(indices: &[GeneralizedIndex]) -> Vec<GeneralizedIndex> {
-    let mut indices_set: HashSet<GeneralizedIndex> = HashSet::new();
-    for &index in indices {
-        let helper_indices = get_helper_indices(&[index]);
-        for helper_index in helper_indices {
-            indices_set.insert(helper_index);
-        }
+fn compute_proof_indices_and_value_mask(
+    indices: &[GeneralizedIndex],
+) -> (Vec<GeneralizedIndex>, Vec<bool>) {
+    let (all_helper_indices, all_path_indices) = indices
+        .par_iter()
+        .with_min_len(10000)
+        .map(|&index| {
+            let branch = get_branch_indices(index);
+            let path = get_path_indices(index);
+            (
+                branch.into_iter().collect::<HashSet<_>>(),
+                path.into_iter().collect::<HashSet<_>>(),
+            )
+        })
+        .reduce(
+            || (HashSet::new(), HashSet::new()),
+            |(mut h1, mut p1), (h2, p2)| {
+                h1.extend(h2);
+                p1.extend(p2);
+                (h1, p1)
+            },
+        );
+    let helper_indices = all_helper_indices
+        .difference(&all_path_indices)
+        .map(|a| (*a, false));
+
+    let idx_and_mask = helper_indices
+        .chain(indices.iter().map(|a| (*a, true)))
+        .sorted_by(|(a, _), (b, _)| cmp_binary_lexicographically(*a, *b));
+
+    let (sorted_indices, value_mask) = idx_and_mask.unzip();
+
+    (sorted_indices, value_mask)
+}
+
+/// Compare two GeneralizedIndex values lexicographically in the binary representation (without padding).
+/// Equivalent to: .sorted_by_key(|(index, _)| format!("{:b}", index))
+fn cmp_binary_lexicographically(a: GeneralizedIndex, b: GeneralizedIndex) -> std::cmp::Ordering {
+    if a == 0 && b == 0 {
+        return std::cmp::Ordering::Equal;
+    } else if a == 0 {
+        return std::cmp::Ordering::Less;
+    } else if b == 0 {
+        return std::cmp::Ordering::Greater;
     }
-    for &index in indices {
-        let path_indices = get_path_indices(index);
-        for path_index in path_indices {
-            indices_set.remove(&path_index);
-        }
-        indices_set.insert(index);
+
+    let a_len = GeneralizedIndex::BITS - a.leading_zeros();
+    let b_len = GeneralizedIndex::BITS - b.leading_zeros();
+
+    let a_shifted = a << (GeneralizedIndex::BITS - a_len);
+    let b_shifted = b << (GeneralizedIndex::BITS - b_len);
+
+    match a_shifted.cmp(&b_shifted) {
+        std::cmp::Ordering::Equal => a_len.cmp(&b_len),
+        other => other,
     }
-    let mut sorted_indices: Vec<GeneralizedIndex> = indices_set.into_iter().collect();
-    sorted_indices.sort_by_key(|index| format!("{:b}", *index));
-    sorted_indices
 }
 
 fn compute_proof_descriptor(proof_indices: &[GeneralizedIndex]) -> Result<Descriptor> {

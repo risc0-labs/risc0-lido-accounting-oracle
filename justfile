@@ -1,4 +1,5 @@
 set dotenv-load := true
+set dotenv-required := true
 
 build:
     #!/usr/bin/env bash

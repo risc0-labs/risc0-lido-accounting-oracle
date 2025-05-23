@@ -325,6 +325,7 @@ async fn build_membership_proof<'a>(
         .write_frame(&bincode::serialize(&input)?)
         .build()?;
 
+    tracing::info!("Generating membership proof...");
     let session_info = default_prover().prove_with_ctx(
         env,
         &VerifierContext::default(),
@@ -393,6 +394,7 @@ async fn build_aggregate_proof<'a>(
         .write_frame(&bincode::serialize(&input)?)
         .build()?;
 
+    tracing::info!("Generating aggregate proof...");
     let session_info = default_prover().prove_with_ctx(
         env,
         &VerifierContext::default(),
