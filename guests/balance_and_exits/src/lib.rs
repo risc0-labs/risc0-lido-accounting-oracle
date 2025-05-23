@@ -35,7 +35,7 @@ mod tests {
     /// Returns an Anvil provider the WITHDRAWAL_VAULT_ADDRESS balance set to 33 ether
     async fn test_provider() -> impl Provider + Clone {
         let provider = ProviderBuilder::new()
-            .on_anvil_with_wallet_and_config(|anvil| anvil.args(["--hardfork", "cancun"]))
+            .connect_anvil_with_wallet_and_config(|anvil| anvil.args(["--hardfork", "cancun"]))
             .unwrap();
         let node_info = provider.anvil_node_info().await.unwrap();
         println!("Anvil started: {:?}", node_info);

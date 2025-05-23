@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use alloy::hex::FromHex;
+use alloy_primitives::B256;
 use beacon_state::mainnet::BeaconState;
 use ethereum_consensus::{
     phase0::SignedBeaconBlockHeader, primitives::Root, types::mainnet::BeaconBlock, Fork,
@@ -119,12 +121,15 @@ impl BeaconClient {
         Ok(result.data.header)
     }
 
-    /// Retrieves block details for given block id.
+    /// Retrieves block hash for given beacon block id (e.g. slot).
     #[tracing::instrument(skip(self), fields(block_id = %block_id))]
-    pub async fn get_block(&self, block_id: impl Display) -> Result<BeaconBlock, Error> {
+    pub async fn get_eth1_block_hash_at_slot(&self, block_id: impl Display) -> Result<B256, Error> {
         let path = format!("eth/v2/beacon/blocks/{block_id}");
-        let result: Response<GetBlockResponse> = self.http_get(&path).await?;
-        Ok(result.data.message)
+        let result: serde_json::Value = self.http_get(&path).await?;
+        let hash_str = result["data"]["message"]["body"]["eth1_data"]["block_hash"]
+            .as_str()
+            .unwrap();
+        Ok(B256::from_hex(&hash_str.trim_start_matches("0x")).unwrap())
     }
 
     #[tracing::instrument(skip(self), fields(state_id = %state_id))]

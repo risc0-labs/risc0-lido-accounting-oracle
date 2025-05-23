@@ -52,8 +52,8 @@ pub fn main() {
     } = deserialize(&input_bytes).expect("Failed to deserialize input");
 
     // obtain the withdrawal vault balance from the EVM input
-    let env = evm_input.into_env(&CHAIN_SPEC);
-    let account = Account::new(WITHDRAWAL_VAULT_ADDRESS, &env);
+    let evm_env = evm_input.into_env(&CHAIN_SPEC);
+    let account = Account::new(WITHDRAWAL_VAULT_ADDRESS, &evm_env);
     let withdrawal_vault_balance: U256 = account.info().balance;
 
     block_multiproof
@@ -91,7 +91,7 @@ pub fn main() {
         totalDepositedValidators: U256::from(num_validators),
         totalExitedValidators: U256::from(num_exited_validators),
         blockRoot: block_root.into(),
-        commitment: env.into_commitment(),
+        commitment: evm_env.into_commitment(),
     };
     env::commit_slice(&journal.abi_encode());
 }

@@ -10,33 +10,20 @@ build:
         cargo build --release
     fi
 
-## Input building tasks
-
-build_input_initialization slot: build
-    ./target/release/cli --slot {{slot}} build --out ./input_membership_initialization_{{slot}}.input initial
-
-build_input_continuation prior_slot slot: build
-    ./target/release/cli --slot {{slot}} build --out ./input_membership_continuation_{{prior_slot}}_to_{{slot}}.input continuation-from {{prior_slot}} --prior-input-path ./input_membership_initialization_{{prior_slot}}.input
-
-build_input_aggregation slot: build
-    ./target/release/cli --slot {{slot}} build --out ./input_aggregation_{{slot}}.input aggregation
-
-
 ## Proving tasks
 
 prove_membership_init slot: build
-    ./target/release/cli --slot {{slot}} prove --input ./input_membership_initialization_{{slot}}.input --out ./membership_proof_{{slot}}.input initial
+    ./target/release/cli --slot {{slot}} prove --out ./membership_proof_{{slot}}.proof initial
 
 prove_membership_continuation prior_slot slot: build
-    ./target/release/cli --slot {{slot}} prove --input ./input_membership_continuation_{{prior_slot}}_to_{{slot}}.input --out ./membership_proof_{{slot}}.input continuation-from ./membership_proof_{{prior_slot}}.input
+    ./target/release/cli --slot {{slot}} prove --out ./membership_proof_{{slot}}.proof continuation-from ./membership_proof_{{prior_slot}}.proof
 
 prove_aggregate slot: build
-    ./target/release/cli --slot {{slot}} prove --input ./input_aggregation_{{slot}}.input --out ./aggregate_proof_{{slot}}.input aggregation ./membership_proof_{{slot}}.input
+    ./target/release/cli --slot {{slot}} prove --out ./aggregate_proof_{{slot}}.proof aggregation ./membership_proof_{{slot}}.proof
 
 ## helper for doing all the steps
 
-prove_all slot: (build_input_initialization slot) (prove_membership_init slot) (build_input_aggregation slot) (prove_aggregate slot)
-
+prove_all slot: (prove_membership_init slot) (prove_aggregate slot)
 
 ## Submission to chain
 
