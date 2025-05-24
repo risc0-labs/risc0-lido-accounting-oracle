@@ -107,7 +107,15 @@ cargo risczero --version
 
 This repo uses [just](https://github.com/casey/just) as a command runner. Installation instructions [here](https://github.com/casey/just?tab=readme-ov-file#installation)
 
-It also uses git-lfs to manage cached inputs. Ensure this is installed.
+## Running tests
+
+Use
+
+```shell
+just test
+```
+
+Attempting to run tests with `cargo test` will fail unless they can generate proofs locally.
 
 ## Usage
 
@@ -142,48 +150,42 @@ See the [deployment guide](./docs/deployment-guide.md) for instructions on deplo
 
 ### Simple Usage via CLI
 
-Using the justfile scripts provides a simple way to get started and examples of using the CLI. These will write intermediate files into the current directory.
+Using the justfile scripts provides a simple way to get started and examples of using the CLI. These will write intermediate proof files into the current directory.
 These are mostly included for example usage of the CLI. For a production deployment use the CLI directly as required.
 
 #### Initial membership proof
 
-The repo comes with the mainnet inputs built for slot 11494239.
-
 To create a proof run
 
 ```shell
-just prove_membership_init 11494239
+just prove_membership_init <slot>
 ```
 
 #### Updating a membership proof
 
-Update an existing membership proof to a newer beacon chain slot, e.g. to slot 11495000, you will need to build the inputs and then build a proof. Run
+Update an existing membership proof to a newer beacon chain slot you will need to build the inputs and then build a proof. Run
 
 ```shell
-just build_input_continuation 11494239 11495000
-just prove_membership_continuation 11494239 11495000
+just prove_membership_continuation <slot> <new_slot>
 ```
 
-This will write a new proof that composes the old one and proves the membership of all validators up to slot 11495000. There is no need to update membership proofs but it is a good way to save proving cycles.
+This will write a new proof that composes the old one and proves the membership of all validators up to slot `new_slot`. There is no need to update membership proofs but it is a good way to save proving cycles.
 
 #### Building an aggregate oracle proof
 
 To build a proof at this new slot ready to submit on-chain run:
 
 ```shell
-just build_input_aggregation 11495000
-just prove_aggregate 11495000
+just prove_aggregate <slot>
 ```
 
-This requires that a membership proof (either initial or continuation) for slot 1100 has already been created. It will write to file a proof and report ready to submit on-chain
+This requires that a membership proof (either initial or continuation) for `slot` has already been created. It will write to file a proof and report ready to submit on-chain
 
-> [!NOTE]
-> For slots containing many Lido validators this will take a long time to build the SSZ proof input locally (hours) and to generate the proof (minutes on Bonsai)
 
 Submit on-chain with:
 
 ```shell
-just submit 11495000
+just submit <slot>
 ```
 
 #### More advanced usage
@@ -191,13 +193,12 @@ just submit 11495000
 Using the CLI directly provides more flexibility. See the help and subcommands help
 
 ```
-> cargo run --help
+> cargo run -- --help
 CLI for generating and submitting Lido oracle proofs
 
 Usage: cli [OPTIONS] --slot <SLOT> <COMMAND>
 
 Commands:
-  build   Build an input for a proof
   prove   Generate a proof from a given input
   submit  Submit an aggregation proof to the oracle contract
   help    Print this message or the help of the given subcommand(s)

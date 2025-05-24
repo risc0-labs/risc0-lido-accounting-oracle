@@ -23,13 +23,19 @@ use guest_io::balance_and_exits::{Input, Journal};
 use guest_io::validator_membership::Journal as MembershipJounal;
 use guest_io::{InputWithReceipt, WITHDRAWAL_VAULT_ADDRESS};
 use membership_builder::VALIDATOR_MEMBERSHIP_ID;
-use risc0_steel::ethereum::ETH_SEPOLIA_CHAIN_SPEC;
 use risc0_steel::Account;
 use risc0_zkvm::guest::env;
 use risc0_zkvm::Receipt;
 use ssz_multiproofs::ValueIterator;
 
 type Node = [u8; 32];
+
+#[cfg(feature = "anvil")]
+use guest_io::ANVIL_CHAIN_SPEC as CHAIN_SPEC;
+#[cfg(not(feature = "sepolia"))]
+use risc0_steel::ethereum::ETH_MAINNET_CHAIN_SPEC as CHAIN_SPEC;
+#[cfg(feature = "sepolia")]
+use risc0_steel::ethereum::ETH_SEPOLIA_CHAIN_SPEC as CHAIN_SPEC;
 
 pub fn main() {
     let input_bytes = env::read_frame();
@@ -46,8 +52,8 @@ pub fn main() {
     } = deserialize(&input_bytes).expect("Failed to deserialize input");
 
     // obtain the withdrawal vault balance from the EVM input
-    let env = evm_input.into_env(&ETH_SEPOLIA_CHAIN_SPEC);
-    let account = Account::new(WITHDRAWAL_VAULT_ADDRESS, &env);
+    let evm_env = evm_input.into_env(&CHAIN_SPEC);
+    let account = Account::new(WITHDRAWAL_VAULT_ADDRESS, &evm_env);
     let withdrawal_vault_balance: U256 = account.info().balance;
 
     block_multiproof
@@ -85,7 +91,7 @@ pub fn main() {
         totalDepositedValidators: U256::from(num_validators),
         totalExitedValidators: U256::from(num_exited_validators),
         blockRoot: block_root.into(),
-        commitment: env.into_commitment(),
+        commitment: evm_env.into_commitment(),
     };
     env::commit_slice(&journal.abi_encode());
 }
