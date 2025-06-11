@@ -1,4 +1,4 @@
-// Copyright 2023 RISC Zero, Inc.
+// Copyright 2025 RISC Zero, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -38,7 +38,10 @@ use risc0_steel::ethereum::ETH_MAINNET_CHAIN_SPEC as CHAIN_SPEC;
 use risc0_steel::ethereum::ETH_SEPOLIA_CHAIN_SPEC as CHAIN_SPEC;
 
 pub fn main() {
+    env::log("Reading input");
     let input_bytes = env::read_frame();
+
+    env::log("Deserializing input");
     let InputWithReceipt {
         input:
             Input {
@@ -56,6 +59,7 @@ pub fn main() {
     let account = Account::new(WITHDRAWAL_VAULT_ADDRESS, &evm_env);
     let withdrawal_vault_balance: U256 = account.info().balance;
 
+    env::log("Verifying block multiproof");
     block_multiproof
         .verify(&block_root)
         .expect("Failed to verify block multiproof");
@@ -64,18 +68,21 @@ pub fn main() {
     let slot = get_slot(&mut block_values);
     let state_root = get_state_root(&mut block_values);
 
+    env::log("Verifying state multiproof");
     multiproof
         .verify(&state_root)
         .expect("Failed to verify state multiproof");
     let mut values = multiproof.values();
 
     // Compute the required values from the beacon state values
+    env::log("Computing validator count, balances, exited validators");
     let num_validators = membership.count_ones() as u64;
     let num_exited_validators = count_exited_validators(&mut values, &membership, slot);
     let validator_count = get_validator_count(&mut values);
     let cl_balance = accumulate_balances(&mut values, &membership);
 
     // verify the membership proof
+    env::log("Verifying validator membership proof");
     #[cfg(not(feature = "skip-verify"))]
     verify_membership(
         state_root,

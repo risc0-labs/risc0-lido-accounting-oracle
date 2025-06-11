@@ -7,6 +7,7 @@ This oracle performs provable computation over historical beacon state to determ
 - *clBalanceGwei* - The total balance held by Lido validators
 - *totalDepositedValidators* - The number of Lido validators ever to deposit
 - *totalExitedValidators* - The number of Lido validators that have exited
+- *withdrawalVaultBalance* - The balance of the WithdrawalVault contract on the execution layer
 
 ## Design
 
@@ -61,9 +62,11 @@ GIVEN:
     - SSZ merkle proof for all required state values
         - balance and exit epoch for all membership validators
     - the asserted clBalance, totalDepositedValidators and totalExitedValidators values
+    - A RISC Zero Steel proof of the withdrawal vault balance
 
 ASSERTS:
     - The membership proof is valid
+    - The Steel proof is valid
     - The number of validators in the membership set is equal to the total number of validators
     - The given state root is contained within the block header with the given block root
     - The aggregates clBalance, totalDepositedValidators, totalExitedValidators can be calculated by processing the data for all Lido validators indicated by the membership set
@@ -161,6 +164,9 @@ To create a proof run
 just prove_membership_init <slot>
 ```
 
+> [!NOTE]
+> This will take a long time for the first run but only needs to be done once. Subsequent runs can recursively update this proof which will be much faster.
+
 #### Updating a membership proof
 
 Update an existing membership proof to a newer beacon chain slot you will need to build the inputs and then build a proof. Run
@@ -173,7 +179,7 @@ This will write a new proof that composes the old one and proves the membership 
 
 #### Building an aggregate oracle proof
 
-To build a proof at this new slot ready to submit on-chain run:
+To build a proof at a slot ready to submit on-chain run:
 
 ```shell
 just prove_aggregate <slot>

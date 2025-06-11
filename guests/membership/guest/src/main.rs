@@ -1,4 +1,4 @@
-// Copyright 2023 RISC Zero, Inc.
+// Copyright 2025 RISC Zero, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,8 +26,10 @@ use guest_io::{InputWithReceipt, WITHDRAWAL_CREDENTIALS};
 use risc0_zkvm::guest::env;
 
 pub fn main() {
+    env::log("Reading input");
     let input_bytes = env::read_frame();
 
+    env::log("Deserializing input");
     let InputWithReceipt {
         input:
             Input {
@@ -42,6 +44,7 @@ pub fn main() {
     } = deserialize(&input_bytes).expect("Failed to deserialize input");
 
     // verify the multi-proof which verifies leaf values
+    env::log("Verifying SSZ multiproof");
     multiproof
         .verify(&state_root)
         .expect("Failed to verify multiproof");
@@ -71,7 +74,7 @@ pub fn main() {
                         "Missing historical summary multiproof for a long range continuation",
                     );
                     let historical_summary_root =
-                        multiproof // using a get here for now but this does cause an extra iteration through the values :(
+                        multiproof // using a get here for now but this does cause an extra iteration through the values
                             .get::<32>(beacon_state_gindices::historical_summaries(
                                 prior_slot,
                             ))
@@ -98,6 +101,7 @@ pub fn main() {
                 prior_proof_journal.to_bytes().unwrap()
             );
             // Verify the prior membership proof.
+            env::log("Verifying prior membership ZK proof");
             #[cfg(not(feature = "skip-verify"))]
             prior_receipt
                 .verify(self_program_id)
@@ -118,6 +122,7 @@ pub fn main() {
             .unwrap_or(usize::MAX),
     );
 
+    env::log("Enumerating validators");
     for validator_index in start_validator_index..=max_validator_index {
         let value = values
             .next_assert_gindex(beacon_state_gindices::validator_withdrawal_credentials(
