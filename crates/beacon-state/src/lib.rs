@@ -10,7 +10,6 @@ use ethereum_consensus::{
     ssz::prelude::*,
     Fork as Version,
 };
-// TODO(ec2): Remove all of this when electra is properly implemented in upstream ethereum-consensus
 
 pub mod mainnet {
     use ethereum_consensus::altair::mainnet::SYNC_COMMITTEE_SIZE;
