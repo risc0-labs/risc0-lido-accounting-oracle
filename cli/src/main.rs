@@ -279,8 +279,7 @@ async fn build_membership_input<'a>(
 
         tracing::info!("Retrieving intermediate beacon state...");
         let prior_beacon_state = beacon_client.get_beacon_state(prior_slot).await?;
-        let prior_max_validator_index =
-            prior_beacon_state.validators().len().saturating_sub(1) as u64;
+        let prior_max_validator_index = (prior_beacon_state.validators().len() - 1) as u64;
 
         tracing::info!("Building input. This may take a few minutes...");
         Input::build_continuation(

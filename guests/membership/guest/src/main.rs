@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::usize;
-
 use bincode::deserialize;
 use bitvec::prelude::*;
 use gindices::presets::mainnet::beacon_state::post_electra as beacon_state_gindices;
@@ -43,6 +41,11 @@ pub fn main() {
         receipt: prior_receipt,
     } = deserialize(&input_bytes).expect("Failed to deserialize input");
 
+    env::log(&format!(
+        "Proving membership of validators up to {} validator index",
+        max_validator_index
+    ));
+
     // verify the multi-proof which verifies leaf values
     env::log("Verifying SSZ multiproof");
     multiproof
@@ -59,7 +62,10 @@ pub fn main() {
             prior_slot,
             prior_state_root,
         } => {
-            env::log("Generating continuation proof");
+            env::log(&format!(
+                "Generating continuation proof from prior max validator index {}",
+                prior_max_validator_index
+            ));
             match cont_type {
                 SameSlot => {
                     assert_eq!(state_root, prior_state_root);
@@ -89,7 +95,6 @@ pub fn main() {
                     assert_eq!(stored_root, &prior_state_root);
                 }
             }
-            let prior_receipt = prior_receipt.expect("Missing prior receipt for continuation");
             // ensure the values in the journal match
             let prior_proof_journal = Journal {
                 self_program_id,
@@ -97,17 +102,20 @@ pub fn main() {
                 max_validator_index: prior_max_validator_index,
                 membership: prior_membership,
             };
-            assert_eq!(
-                prior_receipt.journal.bytes,
-                prior_proof_journal.to_bytes().unwrap()
-            );
-            // Verify the prior membership proof.
+
             #[cfg(not(feature = "skip-verify"))]
-            env::log("Verifying prior membership ZK proof");
-            #[cfg(not(feature = "skip-verify"))]
-            prior_receipt
-                .verify(self_program_id)
-                .expect("Failed to verify prior receipt");
+            {
+                let prior_receipt = prior_receipt.expect("Missing prior receipt for continuation");
+
+                assert_eq!(
+                    prior_receipt.journal.bytes,
+                    prior_proof_journal.to_bytes().unwrap()
+                );
+                // Verify the prior membership proof.
+                prior_receipt
+                    .verify(self_program_id)
+                    .expect("Failed to verify prior receipt");
+            }
 
             (
                 prior_max_validator_index + 1,
@@ -119,9 +127,10 @@ pub fn main() {
     // Reserve the capacity for the membership bitvector to save cycles reallocating
     // and to save memory by not overallocating
     membership.reserve(
-        (max_validator_index - start_validator_index)
+        max_validator_index
+            .saturating_sub(start_validator_index)
             .try_into()
-            .unwrap_or(usize::MAX),
+            .unwrap(),
     );
 
     env::log("Enumerating validators");
@@ -141,4 +150,5 @@ pub fn main() {
         membership,
     };
     env::commit(&journal);
+    env::log("Execution complete");
 }

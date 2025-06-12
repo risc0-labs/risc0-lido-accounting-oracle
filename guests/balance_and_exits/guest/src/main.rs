@@ -83,14 +83,15 @@ pub fn main() {
 
     // verify the membership proof
     #[cfg(not(feature = "skip-verify"))]
-    env::log("Verifying validator membership proof");
-    #[cfg(not(feature = "skip-verify"))]
-    verify_membership(
-        state_root,
-        membership,
-        validator_count,
-        membership_receipt.expect("No membership receipt provided"),
-    );
+    {
+        env::log("Verifying validator membership proof");
+        verify_membership(
+            state_root,
+            membership,
+            validator_count,
+            membership_receipt.expect("No membership receipt provided"),
+        );
+    }
 
     // Commit the journal
     let journal = Journal {
