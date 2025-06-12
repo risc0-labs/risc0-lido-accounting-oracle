@@ -143,6 +143,9 @@ This will read the .env file for RPC and other params.
 
 See the [deployment guide](./docs/deployment-guide.md) for instructions on deploying to different chains
 
+> [!IMPORTANT]
+> Don't forget to obtain the deployed contract address and paste it in the .env file if you want to submit via the CLI
+
 ### Simple Usage via CLI
 
 Using the justfile scripts provides a simple way to get started and examples of using the CLI. These will write intermediate proof files into the current directory.

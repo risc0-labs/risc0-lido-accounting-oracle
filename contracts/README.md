@@ -2,7 +2,7 @@
 
 ## Developing Locally
 
-This project uses [foundry](https://getfoundry.sh) and Soldeer for dependency management.
+This project uses [Foundry](https://getfoundry.sh) and Soldeer for dependency management.
 
 Install dependencies with 
 
