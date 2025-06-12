@@ -82,6 +82,7 @@ pub fn main() {
     let cl_balance = accumulate_balances(&mut values, &membership);
 
     // verify the membership proof
+    #[cfg(not(feature = "skip-verify"))]
     env::log("Verifying validator membership proof");
     #[cfg(not(feature = "skip-verify"))]
     verify_membership(

@@ -59,6 +59,7 @@ pub fn main() {
             prior_slot,
             prior_state_root,
         } => {
+            env::log("Generating continuation proof");
             match cont_type {
                 SameSlot => {
                     assert_eq!(state_root, prior_state_root);
@@ -101,6 +102,7 @@ pub fn main() {
                 prior_proof_journal.to_bytes().unwrap()
             );
             // Verify the prior membership proof.
+            #[cfg(not(feature = "skip-verify"))]
             env::log("Verifying prior membership ZK proof");
             #[cfg(not(feature = "skip-verify"))]
             prior_receipt

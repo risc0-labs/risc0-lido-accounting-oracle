@@ -149,14 +149,9 @@ async fn main() -> Result<()> {
             command: ProveCommand::Initial,
             beacon_rpc_url,
         } => {
-            let input = build_membership_input(
-                beacon_rpc_url,
-                args.slot,
-                args.max_validator_index,
-                None,
-                None,
-            )
-            .await?;
+            let input =
+                build_membership_input(beacon_rpc_url, args.slot, args.max_validator_index, None)
+                    .await?;
             let proof =
                 build_membership_proof(input, None, args.slot, args.max_validator_index).await?;
             write(out_path, &bincode::serialize(&proof)?)?;
@@ -172,7 +167,6 @@ async fn main() -> Result<()> {
                 args.slot,
                 args.max_validator_index,
                 Some(prior_proof.slot),
-                None,
             )
             .await?;
             let proof = build_membership_proof(
@@ -243,7 +237,6 @@ async fn build_membership_input<'a>(
     slot: u64,
     max_validator_index: Option<u64>,
     prior_slot: Option<u64>,
-    prior_max_validator_index: Option<u64>,
 ) -> Result<guest_io::validator_membership::Input<'a>> {
     use guest_io::validator_membership::Input;
 
@@ -267,9 +260,7 @@ async fn build_membership_input<'a>(
     let max_validator_index =
         max_validator_index.unwrap_or((beacon_state.validators().len() - 1) as u64);
 
-    let input = if let (Some(prior_slot), Some(prior_max_validator_index)) =
-        (prior_slot, prior_max_validator_index)
-    {
+    let input = if let Some(prior_slot) = prior_slot {
         let hist_summary = if beacon_state.slot() > prior_slot + (SLOTS_PER_HISTORICAL_ROOT as u64)
         {
             // this is a long range continuation and we need to provide an intermediate historical summary
@@ -288,6 +279,8 @@ async fn build_membership_input<'a>(
 
         tracing::info!("Retrieving intermediate beacon state...");
         let prior_beacon_state = beacon_client.get_beacon_state(prior_slot).await?;
+        let prior_max_validator_index =
+            prior_beacon_state.validators().len().saturating_sub(1) as u64;
 
         tracing::info!("Building input. This may take a few minutes...");
         Input::build_continuation(
