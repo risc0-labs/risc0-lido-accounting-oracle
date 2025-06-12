@@ -118,7 +118,7 @@ Use
 just test
 ```
 
-Attempting to run tests with `cargo test` will fail unless they can generate proofs locally.
+Attempting to run tests with `cargo test` will fail unless you can generate proofs locally, and even then it will take a long time.
 
 ## Usage
 
@@ -130,14 +130,6 @@ Building proofs requires access to a beacon chain RPC (that supports the `debug_
 > Many beacon chain RPC provides do not support the required debug methods for retrieving beacon state to build a proof. Quiknode is known to provide this but there may also be others.
 
 These are configured via environment variables. Copy the [.env.example] to a .env file in the repo root and configure for your remote services.
-
---- 
-
-By default the repo builds the CLI and guest for mainnet but it also has a feature to configure it to work with Sepolia. Use 
-
-```shell
-cargo build --release --features "sepolia"
-```
 
 ### Contract Deployment
 
