@@ -1,5 +1,21 @@
 # Solidity Contracts
 
+## Developing Locally
+
+This project uses [foundry](https://getfoundry.sh) and Soldeer for dependency management.
+
+Install dependencies with 
+
+```shell
+forge soldeer install
+```
+
+Build contracts with
+
+```shell
+forge build
+```
+
 ## Generated Contracts
 
 As part of the build process, this template generates the `ImageID.sol` and `Elf.sol` contracts.

@@ -29,7 +29,7 @@ prove_all slot: (prove_membership_init slot) (prove_aggregate slot)
 ## Submission to chain
 
 submit slot: build
-    ./target/release/cli --slot {{slot}} submit --proof ./aggregate_proof_{{slot}}.input
+    ./target/release/cli --slot {{slot}} submit --proof ./aggregate_proof_{{slot}}.proof
 
 # Deploy contracts
 
