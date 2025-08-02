@@ -27,7 +27,7 @@ contract TestVerifier is ITestVerifier {
     IRiscZeroVerifier public immutable verifier;
 
     /// @notice Image ID of the only zkVM guest to accept verification from.
-    bytes32 public constant imageId = ImageID.BALANCE_AND_EXITS_ID;
+    bytes32 public constant imageId = ImageID.MAINNET_ID;
 
     /// @notice Initialize the contract, binding it to a specified RISC Zero verifier.
     constructor(IRiscZeroVerifier _verifier) {
