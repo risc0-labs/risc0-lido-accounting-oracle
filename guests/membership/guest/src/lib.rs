@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use alloy_primitives::B256;
 use bincode::deserialize;
 use bitvec::prelude::*;
 use gindices::presets::mainnet::beacon_state::post_electra as beacon_state_gindices;
@@ -20,10 +21,10 @@ use guest_io::validator_membership::{
     ContinuationType::{LongRange, SameSlot, ShortRange},
     Input, Journal, ProofType,
 };
-use guest_io::{InputWithReceipt, WITHDRAWAL_CREDENTIALS};
+use guest_io::InputWithReceipt;
 use risc0_zkvm::guest::env;
 
-pub fn main() {
+pub fn entry(withdrawal_credentials: B256) {
     env::log("Reading input");
     let input_bytes = env::read_frame();
 
@@ -82,7 +83,7 @@ pub fn main() {
                     );
                     let historical_summary_root =
                         multiproof // using a get here for now but this does cause an extra iteration through the values
-                            .get::<32>(beacon_state_gindices::historical_summaries(
+                            .get(beacon_state_gindices::historical_summaries(
                                 prior_slot,
                             ))
                             .unwrap();
@@ -140,7 +141,7 @@ pub fn main() {
                 validator_index,
             ))
             .unwrap();
-        membership.push(value == &WITHDRAWAL_CREDENTIALS);
+        membership.push(value == &withdrawal_credentials);
     }
 
     let journal = Journal {

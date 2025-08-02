@@ -6,7 +6,6 @@ edition = "2021"
 [features]
 default = []
 builder = ["ssz-multiproofs/builder", "dep:ssz_rs", "dep:ethereum-consensus", "dep:gindices", "dep:beacon-state", "risc0-steel/host"]
-sepolia = []
 
 [dependencies]
 ssz-multiproofs = { workspace = true }

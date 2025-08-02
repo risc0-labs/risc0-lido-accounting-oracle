@@ -18,7 +18,7 @@ include!(concat!(env!("OUT_DIR"), "/methods.rs"));
 #[cfg(test)]
 mod tests {
     use gindices::presets::mainnet::beacon_state::{CAPELLA_FORK_SLOT, SLOTS_PER_HISTORICAL_ROOT};
-    use guest_io::validator_membership;
+    use guest_io::{mainnet::WITHDRAWAL_CREDENTIALS, validator_membership};
     use risc0_zkvm::{default_executor, ExecutorEnv, ExitCode, LocalProver, Prover};
     use test_utils::TestStateBuilder;
 
@@ -36,7 +36,7 @@ mod tests {
         let input = validator_membership::Input::build_initial(
             s,
             max_validator_index as u64,
-            super::VALIDATOR_MEMBERSHIP_ID,
+            super::MAINNET_ID,
         )?
         .without_receipt();
         let input_bytes = bincode::serialize(&input).unwrap();
@@ -44,7 +44,7 @@ mod tests {
         let env = ExecutorEnv::builder().write_frame(&input_bytes).build()?;
 
         println!("Starting execution of the program");
-        let session_info = default_executor().execute(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
+        let session_info = default_executor().execute(env, super::MAINNET_ELF)?;
         println!(
             "program execution returned: {:?}",
             session_info
@@ -64,31 +64,28 @@ mod tests {
         b.with_validators(n_validators);
         let s1 = b.build();
 
-        let input = validator_membership::Input::build_initial(
-            s1.clone(),
-            5,
-            super::VALIDATOR_MEMBERSHIP_ID,
-        )?
-        .without_receipt();
+        let input = validator_membership::Input::build_initial(s1.clone(), 5, super::MAINNET_ID)?
+            .without_receipt();
         let env = ExecutorEnv::builder()
             .write_frame(&bincode::serialize(&input).unwrap())
             .build()?;
-        let prove_info = LocalProver::new("test").prove(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
-        prove_info.receipt.verify(super::VALIDATOR_MEMBERSHIP_ID)?;
+        let prove_info = LocalProver::new("test").prove(env, super::MAINNET_ELF)?;
+        prove_info.receipt.verify(super::MAINNET_ID)?;
 
         let input = validator_membership::Input::build_continuation(
+            WITHDRAWAL_CREDENTIALS,
             &s1,
             5,
             &s1,
             max_validator_index as u64,
             None,
-            super::VALIDATOR_MEMBERSHIP_ID,
+            super::MAINNET_ID,
         )?
         .with_receipt(prove_info.receipt);
         let env = ExecutorEnv::builder()
             .write_frame(&bincode::serialize(&input).unwrap())
             .build()?;
-        let session_info = default_executor().execute(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
+        let session_info = default_executor().execute(env, super::MAINNET_ELF)?;
 
         assert_eq!(session_info.exit_code, ExitCode::Halted(0));
 
@@ -109,25 +106,22 @@ mod tests {
         b.with_prior_state(&s1);
         let s2 = b.build();
 
-        let input = validator_membership::Input::build_initial(
-            s1.clone(),
-            5,
-            super::VALIDATOR_MEMBERSHIP_ID,
-        )?
-        .without_receipt();
+        let input = validator_membership::Input::build_initial(s1.clone(), 5, super::MAINNET_ID)?
+            .without_receipt();
 
         let env = ExecutorEnv::builder()
             .write_frame(&bincode::serialize(&input).unwrap())
             .build()?;
-        let prove_info = LocalProver::new("test").prove(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
+        let prove_info = LocalProver::new("test").prove(env, super::MAINNET_ELF)?;
 
         let input = validator_membership::Input::build_continuation(
+            WITHDRAWAL_CREDENTIALS,
             &s1,
             5,
             &s2,
             max_validator_index as u64,
             None,
-            super::VALIDATOR_MEMBERSHIP_ID,
+            super::MAINNET_ID,
         )?
         .with_receipt(prove_info.receipt);
 
@@ -135,7 +129,7 @@ mod tests {
             .write_frame(&bincode::serialize(&input).unwrap())
             .build()?;
 
-        let session_info = default_executor().execute(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
+        let session_info = default_executor().execute(env, super::MAINNET_ELF)?;
         assert_eq!(session_info.exit_code, ExitCode::Halted(0));
         Ok(())
     }
@@ -154,25 +148,22 @@ mod tests {
         let hist_batch = b.with_prior_state(&s1);
         let s2 = b.build();
 
-        let input = validator_membership::Input::build_initial(
-            s1.clone(),
-            5,
-            super::VALIDATOR_MEMBERSHIP_ID,
-        )?
-        .without_receipt();
+        let input = validator_membership::Input::build_initial(s1.clone(), 5, super::MAINNET_ID)?
+            .without_receipt();
 
         let env = ExecutorEnv::builder()
             .write_frame(&bincode::serialize(&input).unwrap())
             .build()?;
-        let prove_info = LocalProver::new("test").prove(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
+        let prove_info = LocalProver::new("test").prove(env, super::MAINNET_ELF)?;
 
         let input = validator_membership::Input::build_continuation(
+            WITHDRAWAL_CREDENTIALS,
             &s1,
             5,
             &s2,
             max_validator_index as u64,
             hist_batch,
-            super::VALIDATOR_MEMBERSHIP_ID,
+            super::MAINNET_ID,
         )?
         .with_receipt(prove_info.receipt);
 
@@ -180,7 +171,7 @@ mod tests {
             .write_frame(&bincode::serialize(&input).unwrap())
             .build()?;
 
-        let session_info = default_executor().execute(env, super::VALIDATOR_MEMBERSHIP_ELF)?;
+        let session_info = default_executor().execute(env, super::MAINNET_ELF)?;
         assert_eq!(session_info.exit_code, ExitCode::Halted(0));
         Ok(())
     }

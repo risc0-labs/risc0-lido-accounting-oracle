@@ -32,10 +32,6 @@ fn main() {
         guest_features.push("skip-verify".to_string());
     }
 
-    if env::var("CARGO_FEATURE_SEPOLIA").is_ok() {
-        guest_features.push("sepolia".to_string());
-    }
-
     println!(
         "cargo:warning=building guest with features: {:?}",
         guest_features

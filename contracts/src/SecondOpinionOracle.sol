@@ -41,7 +41,7 @@ contract SecondOpinionOracle is ISecondOpinionOracle, IOracleProofReceiver {
     uint256 public immutable genesis_block_timestamp;
 
     /// @notice Image ID of the only zkVM guest to accept verification from.
-    bytes32 public constant imageId = ImageID.BALANCE_AND_EXITS_ID;
+    bytes32 public constant imageId = ImageID.MAINNET_ID;
 
     /// @notice Seconds per slot
     uint256 public constant SECONDS_PER_SLOT = 12;
