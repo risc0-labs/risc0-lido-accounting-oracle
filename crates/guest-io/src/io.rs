@@ -39,7 +39,6 @@ pub struct InputWithReceipt<T> {
 }
 
 pub mod validator_membership {
-
     use risc0_zkvm::serde::to_vec;
 
     use super::*;
@@ -104,6 +103,7 @@ pub mod validator_membership {
             self_program_id
         ))]
         pub fn build_continuation<D: Into<Digest>>(
+            withdrawal_credentials: B256,
             prior_beacon_state: &BeaconState,
             prior_max_validator_index: u64,
             beacon_state: &BeaconState,
@@ -127,9 +127,7 @@ pub mod validator_membership {
                 .validators()
                 .iter()
                 .take((prior_max_validator_index + 1) as usize)
-                .map(|v| {
-                    v.withdrawal_credentials.as_slice() == crate::WITHDRAWAL_CREDENTIALS.as_slice()
-                })
+                .map(|v| v.withdrawal_credentials.as_slice() == withdrawal_credentials.as_slice())
                 .collect::<BitVec<u32, Lsb0>>();
 
             let (cont_type, hist_summary_multiproof) = if slot == prior_slot {
@@ -144,7 +142,7 @@ pub mod validator_membership {
                 );
                 let hist_summary_multiproof = MultiproofBuilder::new()
                     .with_gindex(historical_batch_gindices::state_roots(prior_slot).try_into()?)
-                    .build(&historical_batch, Option::<(_, usize)>::None)?;
+                    .build(&historical_batch)?;
                 (ContinuationType::LongRange, Some(hist_summary_multiproof))
             } else {
                 return Err(Error::MissingHistoricalBatch);
@@ -259,6 +257,7 @@ pub mod balance_and_exits {
     impl Input<'_> {
         #[tracing::instrument(skip(block_header, beacon_state, evm_input))]
         pub fn build(
+            withdrawal_credentials: B256,
             block_header: &BeaconBlockHeader,
             beacon_state: &BeaconState,
             evm_input: EthEvmInput,
@@ -268,9 +267,7 @@ pub mod balance_and_exits {
             let membership = beacon_state
                 .validators()
                 .iter()
-                .map(|v| {
-                    v.withdrawal_credentials.as_slice() == crate::WITHDRAWAL_CREDENTIALS.as_slice()
-                })
+                .map(|v| v.withdrawal_credentials.as_slice() == withdrawal_credentials.as_slice())
                 .collect::<BitVec<u32, Lsb0>>();
 
             tracing::info!("{} Lido validators detected", membership.count_ones());
@@ -278,7 +275,7 @@ pub mod balance_and_exits {
             let block_multiproof = MultiproofBuilder::new()
                 .with_gindex(beacon_block_gindices::slot().try_into()?)
                 .with_gindex(beacon_block_gindices::state_root().try_into()?)
-                .build(block_header, Option::<(_, usize)>::None)?;
+                .build(block_header)?;
 
             let state_multiproof_builder = MultiproofBuilder::new()
                 .with_gindex(beacon_state_gindices::validator_count().try_into()?)
@@ -330,50 +327,12 @@ fn build_with_versioned_state(
     builder: MultiproofBuilder,
     beacon_state: &BeaconState,
 ) -> Result<Multiproof<'static>> {
-    use beacon_state::mainnet::ElectraBeaconState;
-
     match beacon_state {
-        BeaconState::Phase0(b) => Ok(builder.build(
-            b,
-            Some((
-                BeaconState::generalized_index(&["validators".into()]).unwrap(),
-                beacon_state.validators().clone(),
-            )),
-        )?),
-        BeaconState::Altair(b) => Ok(builder.build(
-            b,
-            Some((
-                BeaconState::generalized_index(&["validators".into()]).unwrap(),
-                beacon_state.validators().clone(),
-            )),
-        )?),
-        BeaconState::Bellatrix(b) => Ok(builder.build(
-            b,
-            Some((
-                BeaconState::generalized_index(&["validators".into()]).unwrap(),
-                beacon_state.validators().clone(),
-            )),
-        )?),
-        BeaconState::Capella(b) => Ok(builder.build(
-            b,
-            Some((
-                BeaconState::generalized_index(&["validators".into()]).unwrap(),
-                beacon_state.validators().clone(),
-            )),
-        )?),
-        BeaconState::Deneb(b) => Ok(builder.build(
-            b,
-            Some((
-                BeaconState::generalized_index(&["validators".into()]).unwrap(),
-                beacon_state.validators().clone(),
-            )),
-        )?),
-        BeaconState::Electra(b) => Ok(builder.build(
-            b,
-            Some((
-                ElectraBeaconState::generalized_index(&["validators".into()]).unwrap(),
-                beacon_state.validators().clone(),
-            )),
-        )?),
+        BeaconState::Phase0(b) => Ok(builder.build(b)?),
+        BeaconState::Altair(b) => Ok(builder.build(b)?),
+        BeaconState::Bellatrix(b) => Ok(builder.build(b)?),
+        BeaconState::Capella(b) => Ok(builder.build(b)?),
+        BeaconState::Deneb(b) => Ok(builder.build(b)?),
+        BeaconState::Electra(b) => Ok(builder.build(b)?),
     }
 }

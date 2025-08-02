@@ -19,12 +19,19 @@ use alloy::{
     signers::local::PrivateKeySigner,
 };
 use anyhow::{Context, Result};
-use balance_and_exits_builder::{BALANCE_AND_EXITS_ELF, BALANCE_AND_EXITS_ID};
+use balance_and_exits_builder::{
+    MAINNET_ELF as BALANCE_AND_EXITS_ELF, MAINNET_ID as BALANCE_AND_EXITS_ID,
+};
 use beacon_client::BeaconClient;
 use clap::Parser;
 use ethereum_consensus::phase0::mainnet::{HistoricalBatch, SLOTS_PER_HISTORICAL_ROOT};
-use guest_io::{ETH_SEPOLIA_CHAIN_SPEC, WITHDRAWAL_CREDENTIALS, WITHDRAWAL_VAULT_ADDRESS};
-use membership_builder::{VALIDATOR_MEMBERSHIP_ELF, VALIDATOR_MEMBERSHIP_ID};
+use guest_io::{
+    mainnet::{WITHDRAWAL_CREDENTIALS, WITHDRAWAL_VAULT_ADDRESS},
+    ETH_SEPOLIA_CHAIN_SPEC,
+};
+use membership_builder::{
+    MAINNET_ELF as VALIDATOR_MEMBERSHIP_ELF, MAINNET_ID as VALIDATOR_MEMBERSHIP_ID,
+};
 use risc0_ethereum_contracts::encode_seal;
 use risc0_steel::{ethereum::EthEvmEnv, Account};
 use risc0_zkvm::{default_prover, ExecutorEnv, ProverOpts, Receipt, VerifierContext};
@@ -283,6 +290,7 @@ async fn build_membership_input<'a>(
 
         tracing::info!("Building input. This may take a few minutes...");
         Input::build_continuation(
+            WITHDRAWAL_CREDENTIALS,
             &prior_beacon_state,
             prior_max_validator_index,
             &beacon_state,
@@ -366,6 +374,7 @@ async fn build_aggregate_input<'a>(
     let evm_input = env.into_input().await?;
 
     let input = guest_io::balance_and_exits::Input::build(
+        WITHDRAWAL_CREDENTIALS,
         &beacon_block_header.message,
         &beacon_state,
         evm_input,
