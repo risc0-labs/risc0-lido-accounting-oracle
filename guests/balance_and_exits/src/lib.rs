@@ -24,7 +24,9 @@ mod tests {
     use gindices::presets::mainnet::beacon_state::CAPELLA_FORK_SLOT;
     use guest_io::{
         balance_and_exits::{self, Journal},
-        validator_membership, ANVIL_CHAIN_SPEC, WITHDRAWAL_VAULT_ADDRESS,
+        mainnet::WITHDRAWAL_CREDENTIALS,
+        mainnet::WITHDRAWAL_VAULT_ADDRESS,
+        validator_membership, ANVIL_CHAIN_SPEC,
     };
     use risc0_steel::{ethereum::EthEvmEnv, Account};
     use risc0_zkvm::{default_executor, ExecutorEnv, LocalProver, Prover};
@@ -67,7 +69,7 @@ mod tests {
         let input = validator_membership::Input::build_initial(
             s.clone(),
             max_validator_index as u64,
-            membership_builder::VALIDATOR_MEMBERSHIP_ID,
+            membership_builder::MAINNET_ID,
         )?
         .without_receipt();
         let env = ExecutorEnv::builder()
@@ -75,7 +77,7 @@ mod tests {
             .build()?;
 
         let membership_proof = tokio::task::block_in_place(|| {
-            LocalProver::new("test").prove(env, membership_builder::VALIDATOR_MEMBERSHIP_ELF)
+            LocalProver::new("test").prove(env, membership_builder::MAINNET_ELF)
         })?;
 
         // build the Steel input for reading the balance
@@ -101,14 +103,19 @@ mod tests {
         };
         assert_eq!(info, preflight_info, "mismatch in preflight and execution");
 
-        let zkvm_input = balance_and_exits::Input::build(&block_header, &s.clone(), input)?
-            .with_receipt(membership_proof.receipt);
+        let zkvm_input = balance_and_exits::Input::build(
+            WITHDRAWAL_CREDENTIALS,
+            &block_header,
+            &s.clone(),
+            input,
+        )?
+        .with_receipt(membership_proof.receipt);
         let env = ExecutorEnv::builder()
             .write_frame(&bincode::serialize(&zkvm_input).unwrap())
             .build()?;
 
         println!("Starting execution of the program");
-        let session_info = default_executor().execute(env, super::BALANCE_AND_EXITS_ELF)?;
+        let session_info = default_executor().execute(env, super::MAINNET_ELF)?;
         println!("program execution returned: {:?}", session_info.journal);
         println!("total cycles: {}", session_info.cycles());
 

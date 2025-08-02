@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use alloy_primitives::U256;
+use alloy_primitives::{Address, U256};
 use alloy_sol_types::SolValue;
 use bincode::deserialize;
 use bitvec::prelude::*;
@@ -21,8 +21,8 @@ use gindices::presets::mainnet::beacon_block as beacon_block_gindices;
 use gindices::presets::mainnet::beacon_state::post_electra as beacon_state_gindices;
 use guest_io::balance_and_exits::{Input, Journal};
 use guest_io::validator_membership::Journal as MembershipJounal;
-use guest_io::{InputWithReceipt, WITHDRAWAL_VAULT_ADDRESS};
-use membership_builder::VALIDATOR_MEMBERSHIP_ID;
+use guest_io::InputWithReceipt;
+use risc0_steel::ethereum::EthChainSpec;
 use risc0_steel::Account;
 use risc0_zkvm::guest::env;
 use risc0_zkvm::Receipt;
@@ -30,14 +30,18 @@ use ssz_multiproofs::ValueIterator;
 
 type Node = [u8; 32];
 
-#[cfg(feature = "anvil")]
-use guest_io::ANVIL_CHAIN_SPEC as CHAIN_SPEC;
-#[cfg(not(feature = "sepolia"))]
-use risc0_steel::ethereum::ETH_MAINNET_CHAIN_SPEC as CHAIN_SPEC;
-#[cfg(feature = "sepolia")]
-use risc0_steel::ethereum::ETH_SEPOLIA_CHAIN_SPEC as CHAIN_SPEC;
+// #[cfg(feature = "anvil")]
+// use guest_io::ANVIL_CHAIN_SPEC as CHAIN_SPEC;
+// #[cfg(not(feature = "sepolia"))]
+// use risc0_steel::ethereum::ETH_MAINNET_CHAIN_SPEC as CHAIN_SPEC;
+// #[cfg(feature = "sepolia")]
+// use risc0_steel::ethereum::ETH_SEPOLIA_CHAIN_SPEC as CHAIN_SPEC;
 
-pub fn main() {
+pub fn entry(
+    spec: &EthChainSpec,
+    withdrawal_vault_address: Address,
+    membership_program_id: [u32; 8],
+) {
     env::log("Reading input");
     let input_bytes = env::read_frame();
 
@@ -55,8 +59,8 @@ pub fn main() {
     } = deserialize(&input_bytes).expect("Failed to deserialize input");
 
     // obtain the withdrawal vault balance from the EVM input
-    let evm_env = evm_input.into_env(&CHAIN_SPEC);
-    let account = Account::new(WITHDRAWAL_VAULT_ADDRESS, &evm_env);
+    let evm_env = evm_input.into_env(spec);
+    let account = Account::new(withdrawal_vault_address, &evm_env);
     let withdrawal_vault_balance: U256 = account.info().balance;
 
     env::log("Verifying block multiproof");
@@ -86,6 +90,7 @@ pub fn main() {
     {
         env::log("Verifying validator membership proof");
         verify_membership(
+            membership_program_id,
             state_root,
             membership,
             validator_count,
@@ -106,13 +111,14 @@ pub fn main() {
 }
 
 fn verify_membership(
+    membership_program_id: [u32; 8],
     state_root: &Node,
     membership: BitVec<u32, Lsb0>,
     validator_count: u64,
     membership_receipt: Receipt,
 ) {
     let j = MembershipJounal {
-        self_program_id: VALIDATOR_MEMBERSHIP_ID.into(),
+        self_program_id: membership_program_id.into(),
         state_root: state_root.clone().into(),
         membership: membership,
         max_validator_index: validator_count - 1,
@@ -120,7 +126,7 @@ fn verify_membership(
     let membership_receipt = membership_receipt;
     assert_eq!(membership_receipt.journal.bytes, j.to_bytes().unwrap());
     membership_receipt
-        .verify(VALIDATOR_MEMBERSHIP_ID)
+        .verify(membership_program_id)
         .expect("Failed to verify membership receipt");
 }
 
