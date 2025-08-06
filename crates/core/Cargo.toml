@@ -28,3 +28,11 @@ sha2 = { workspace = true}
 ssz_rs = { workspace = true, optional = true }
 ethereum-consensus = { workspace = true, optional = true }
 beacon-state = { workspace = true, optional = true}
+
+
+[dev-dependencies]
+alloy = { workspace = true, features = ["node-bindings"] }
+anyhow = { workspace = true }
+test-utils = { workspace = true }
+oracle_builder = { workspace = true }
+tokio = { workspace = true }

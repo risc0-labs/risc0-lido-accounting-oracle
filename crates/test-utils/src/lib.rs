@@ -31,6 +31,7 @@ impl TestStateBuilder {
         for _ in 0..n_lido_validators {
             self.inner.validators.push(Validator {
                 withdrawal_credentials: WITHDRAWAL_CREDENTIALS.as_slice().try_into().unwrap(),
+                exit_epoch: 123,
                 ..Default::default()
             });
             self.inner.balances.push(10);

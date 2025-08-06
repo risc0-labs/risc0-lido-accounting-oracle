@@ -14,7 +14,6 @@ use gindices::presets::mainnet::{
 };
 use risc0_steel::ethereum::EthChainSpec;
 use risc0_steel::Account;
-use risc0_zkvm::guest::env;
 use sha2::{Digest, Sha256};
 use ssz_multiproofs::ValueIterator;
 
@@ -41,7 +40,7 @@ pub fn generate_oracle_report(
     let account = Account::new(withdrawal_vault_address, &evm_env);
     let withdrawal_vault_balance: U256 = account.info().balance;
 
-    env::log("Verifying block multiproof");
+    tracing::info!("Verifying block multiproof");
     block_multiproof
         .verify(&block_root)
         .expect("Failed to verify block multiproof");
@@ -50,7 +49,7 @@ pub fn generate_oracle_report(
     let slot = get_slot(&mut block_values);
     let state_root = get_state_root(&mut block_values);
 
-    env::log("Verifying state multiproof");
+    tracing::info!("Verifying state multiproof");
     multiproof
         .verify(&state_root)
         .expect("Failed to verify state multiproof");
@@ -106,14 +105,16 @@ pub fn generate_oracle_report(
     };
 
     let n_validators = u64_from_b256(
-        values.next_assert_gindex(beacon_state_gindices::validator_count())?,
+        multiproof
+            .get(beacon_state_gindices::validator_count())
+            .expect("validators len not available in multiproof"),
         0,
     );
 
     // Reserve the capacity for the membership bitvector to save cycles reallocating
     membership.reserve(n_validators.saturating_sub(membership.len() as u64) as usize);
 
-    for validator_index in (membership.len() as u64 + 1)..n_validators {
+    for validator_index in (membership.len() as u64)..n_validators {
         let value = values.next_assert_gindex(
             beacon_state_gindices::validator_withdrawal_credentials(validator_index),
         )?;
@@ -121,8 +122,13 @@ pub fn generate_oracle_report(
     }
 
     // Compute the required oracle values from the beacon state values
-    env::log("Computing validator count, balances, exited validators");
+    tracing::info!("Computing validator count, balances, exited validators");
     let num_exited_validators = count_exited_validators(&mut values, &membership, slot);
+
+    let _ = values // slurp this out of the iterator, we already read it earlier
+        .next_assert_gindex(beacon_state_gindices::validator_count())
+        .expect("validator count not found in multiproof");
+
     let cl_balance = accumulate_balances(&mut values, &membership);
 
     // Commit the journal
