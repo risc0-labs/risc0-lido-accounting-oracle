@@ -12,14 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::input::{
-    ContinuationType::{LongRange, SameSlot, ShortRange},
-    Input, ProofType,
-};
 use crate::journal::Journal;
+use crate::{
+    input::{
+        ContinuationType::{LongRange, ShortRange},
+        Input, ProofType,
+    },
+    receipt::Receipt,
+};
 use crate::{u64_from_b256, Node};
 use alloy_primitives::{Address, U256};
-use alloy_sol_types::SolType;
 use bitvec::prelude::*;
 use bitvec::vec::BitVec;
 use gindices::presets::mainnet::beacon_state::post_electra as beacon_state_gindices;
@@ -32,14 +34,16 @@ use sha2::{Digest, Sha256};
 use ssz_multiproofs::ValueIterator;
 
 use crate::error::Result;
-use bytemuck::cast_slice;
 
-pub fn generate_oracle_report(
-    input: &Input,
+pub fn generate_oracle_report<R>(
+    input: Input<R>,
     spec: &EthChainSpec,
     withdrawal_credentials: &[u8; 32],
     withdrawal_vault_address: Address,
-) -> Result<Journal> {
+) -> Result<Journal>
+where
+    R: Receipt,
+{
     let Input {
         self_program_id,
         block_root,
@@ -50,7 +54,7 @@ pub fn generate_oracle_report(
     } = input;
 
     // obtain the withdrawal vault balance from the EVM input
-    let evm_env = evm_input.clone().into_env(spec);
+    let evm_env = evm_input.into_env(spec);
     let account = Account::new(withdrawal_vault_address, &evm_env);
     let withdrawal_vault_balance: U256 = account.info().balance;
 
@@ -79,12 +83,9 @@ pub fn generate_oracle_report(
             prior_state_root,
         } => {
             match cont_type {
-                SameSlot => {
-                    assert_eq!(state_root, prior_state_root);
-                }
                 ShortRange => {
                     let stored_root = values
-                        .next_assert_gindex(beacon_state_gindices::state_roots(*prior_slot))?;
+                        .next_assert_gindex(beacon_state_gindices::state_roots(prior_slot))?;
                     assert_eq!(stored_root, &prior_state_root);
                 }
                 LongRange {
@@ -93,28 +94,27 @@ pub fn generate_oracle_report(
                     let historical_summary_root =
                         multiproof // using a get here for now but this does cause an extra iteration through the values
                             .get(beacon_state_gindices::historical_summaries(
-                                *prior_slot,
+                                prior_slot,
                             ))
                             .unwrap();
                     hist_summary_multiproof
                         .verify(&historical_summary_root)
                         .expect("Failed to verify historical summary multiproof given the root in the current state");
                     let stored_root = hist_summary_multiproof
-                        .get(historical_batch_gindices::state_roots(*prior_slot))
+                        .get(historical_batch_gindices::state_roots(prior_slot))
                         .unwrap();
                     assert_eq!(stored_root, &prior_state_root);
                 }
             }
 
-            let journal = Journal::abi_decode(&prior_receipt.journal.bytes)
-                .expect("journal ABI decode failed");
+            let journal = prior_receipt.journal()?;
             assert_eq!(journal.membershipCommitment, hash_bitvec(&prior_membership));
 
             prior_receipt
-                .verify(*self_program_id)
+                .verify(self_program_id)
                 .expect("Failed to verify prior receipt");
 
-            prior_membership.clone() // TODO: Avoid cloning this it is large
+            prior_membership
         }
     };
 
@@ -151,7 +151,7 @@ pub fn generate_oracle_report(
         withdrawalVaultBalanceWei: withdrawal_vault_balance.into(),
         totalDepositedValidators: U256::from(n_validators),
         totalExitedValidators: U256::from(num_exited_validators),
-        blockRoot: *block_root,
+        blockRoot: block_root,
         commitment: evm_env.into_commitment(),
         membershipCommitment: hash_bitvec(&membership).into(),
     };
@@ -227,9 +227,9 @@ fn hash_bitvec(bv: &BitVec<u32>) -> [u8; 32] {
     // Hash bit length first
     hasher.update(&bv.len().to_le_bytes());
 
-    // Then hash the actual bits as bytes
-    let bytes = bv.clone().into_vec();
-    hasher.update(cast_slice(&bytes));
+    // Access underlying storage directly without cloning
+    let raw_slice = bv.as_raw_slice();
+    hasher.update(bytemuck::cast_slice(raw_slice));
 
     hasher.finalize().into()
 }

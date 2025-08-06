@@ -32,6 +32,15 @@ pub enum Error {
 
     #[error("Internal serde failed: {0}")]
     Risc0Serde(#[from] risc0_zkvm::serde::Error),
+
+    #[error("Attempted to build input for a continuation but both the prior slot and the current slot are the same")]
+    SameSlotContinuation,
+
+    #[error("Failed to verify receipt: {0}")]
+    ReceiptVerification(String),
+
+    #[error("Failed to decode journal: {0}")]
+    JournalDecoding(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

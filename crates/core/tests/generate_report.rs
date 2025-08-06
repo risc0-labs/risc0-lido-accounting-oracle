@@ -22,11 +22,15 @@ use lido_oracle_core::{
     generate_oracle_report,
     input::Input,
     mainnet::{WITHDRAWAL_CREDENTIALS, WITHDRAWAL_VAULT_ADDRESS},
+    receipt::DummyReceipt,
     ANVIL_CHAIN_SPEC,
 };
 use test_utils::TestStateBuilder;
 
-use alloy::providers::{ext::AnvilApi, Provider, ProviderBuilder};
+use alloy::{
+    providers::{ext::AnvilApi, Provider, ProviderBuilder},
+    signers::k256::elliptic_curve::rand_core::block,
+};
 
 /// Returns an Anvil provider the WITHDRAWAL_VAULT_ADDRESS balance set to 33 ether
 async fn test_provider() -> impl Provider + Clone {
@@ -45,7 +49,7 @@ async fn test_provider() -> impl Provider + Clone {
 }
 
 #[tokio::test]
-async fn test_simple_initial() -> anyhow::Result<()> {
+async fn test_initial() -> anyhow::Result<()> {
     let n_validators = 10;
     let n_lido_validators = 1;
 
@@ -60,7 +64,7 @@ async fn test_simple_initial() -> anyhow::Result<()> {
     block_header.slot = s.slot();
     block_header.state_root = s.hash_tree_root().unwrap();
 
-    let input = Input::build_initial(
+    let input = Input::<DummyReceipt>::build_initial(
         &ANVIL_CHAIN_SPEC,
         MAINNET_ID,
         &block_header,
@@ -72,7 +76,7 @@ async fn test_simple_initial() -> anyhow::Result<()> {
     .await?;
 
     let journal = generate_oracle_report(
-        &input,
+        input,
         &ANVIL_CHAIN_SPEC,
         &WITHDRAWAL_CREDENTIALS,
         WITHDRAWAL_VAULT_ADDRESS,
@@ -83,6 +87,82 @@ async fn test_simple_initial() -> anyhow::Result<()> {
         parse_ether("33").unwrap()
     );
     assert_eq!(journal.clBalanceGwei, U256::from(10 * n_lido_validators));
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_short_range_continuation() -> anyhow::Result<()> {
+    let n_validators = 10;
+    let n_lido_validators = 1;
+
+    let provider = test_provider().await;
+
+    let mut b = TestStateBuilder::new(CAPELLA_FORK_SLOT);
+    b.with_validators(n_validators);
+    b.with_lido_validators(n_lido_validators);
+    let s = b.build();
+
+    let mut block_header = BeaconBlockHeader::default();
+    block_header.slot = s.slot();
+    block_header.state_root = s.hash_tree_root().unwrap();
+
+    let input = Input::<DummyReceipt>::build_initial(
+        &ANVIL_CHAIN_SPEC,
+        MAINNET_ID,
+        &block_header,
+        &s,
+        &WITHDRAWAL_CREDENTIALS,
+        WITHDRAWAL_VAULT_ADDRESS,
+        provider.clone(),
+    )
+    .await?;
+
+    let journal = generate_oracle_report(
+        input,
+        &ANVIL_CHAIN_SPEC,
+        &WITHDRAWAL_CREDENTIALS,
+        WITHDRAWAL_VAULT_ADDRESS,
+    )?;
+
+    assert_eq!(
+        journal.withdrawalVaultBalanceWei,
+        parse_ether("33").unwrap()
+    );
+    assert_eq!(journal.clBalanceGwei, U256::from(10 * n_lido_validators));
+
+    let receipt = DummyReceipt::from(journal);
+
+    let mut b = TestStateBuilder::new(CAPELLA_FORK_SLOT + 1);
+    b.with_validators(n_validators);
+    b.with_lido_validators(n_lido_validators);
+    b.with_prior_state(&s);
+    let s1 = b.build();
+
+    let mut block_header1 = BeaconBlockHeader::default();
+    block_header1.slot = s1.slot();
+    block_header1.state_root = s1.hash_tree_root().unwrap();
+
+    let continuation_input = Input::<DummyReceipt>::build_continuation(
+        &ANVIL_CHAIN_SPEC,
+        MAINNET_ID,
+        &block_header1,
+        &s1,
+        &WITHDRAWAL_CREDENTIALS,
+        WITHDRAWAL_VAULT_ADDRESS,
+        &s,
+        receipt,
+        None,
+        provider.clone(),
+    )
+    .await?;
+
+    let continuation_journal = generate_oracle_report(
+        continuation_input,
+        &ANVIL_CHAIN_SPEC,
+        &WITHDRAWAL_CREDENTIALS,
+        WITHDRAWAL_VAULT_ADDRESS,
+    )?;
 
     Ok(())
 }

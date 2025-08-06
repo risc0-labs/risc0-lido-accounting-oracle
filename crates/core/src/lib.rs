@@ -16,6 +16,7 @@ mod error;
 mod generate_report;
 pub mod input;
 pub mod journal;
+pub mod receipt;
 
 #[cfg(feature = "builder")]
 use beacon_state::mainnet::BeaconState;

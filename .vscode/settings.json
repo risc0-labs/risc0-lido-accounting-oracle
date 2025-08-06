@@ -1,7 +1,6 @@
 {
     "rust-analyzer.linkedProjects": [
         "./Cargo.toml",
-        "./guests/membership/guest/Cargo.toml",
         "./guests/oracle/guest/Cargo.toml",
     ],
     "rust-analyzer.check.extraEnv": {

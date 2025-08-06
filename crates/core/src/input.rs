@@ -19,7 +19,7 @@ use risc0_steel::alloy::providers::Provider;
 #[cfg(feature = "builder")]
 use risc0_steel::ethereum::EthChainSpec;
 use risc0_steel::ethereum::EthEvmInput;
-use risc0_zkvm::{Digest, Receipt};
+use risc0_zkvm::Digest;
 use ssz_multiproofs::Multiproof;
 
 #[cfg(feature = "builder")]
@@ -41,7 +41,7 @@ use {
 };
 
 #[derive(serde::Serialize, serde::Deserialize)]
-pub struct Input<'a> {
+pub struct Input<'a, R> {
     /// The Program ID of this program. Need to accept it as input rather than hard-code otherwise it creates a cyclic hash reference
     /// This MUST be written to the journal and checked by the verifier! See https://github.com/risc0/risc0-ethereum/blob/main/contracts/src/RiscZeroSetVerifier.sol#L114
     pub self_program_id: Digest,
@@ -62,17 +62,17 @@ pub struct Input<'a> {
 
     /// If this proof is a continuation, the membership status of the validators
     #[serde(borrow)]
-    pub proof_type: ProofType<'a>,
+    pub proof_type: ProofType<'a, R>,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub enum ProofType<'a> {
+pub enum ProofType<'a, R> {
     Initial,
     Continuation {
         #[serde(borrow)]
         cont_type: ContinuationType<'a>,
         /// Journal to verify the previous proof
-        prior_receipt: Receipt,
+        prior_receipt: R,
         /// The prior membership bitfield for the previous proof to be checked against the journal membershipCommitment
         prior_membership: BitVec<u32, Lsb0>,
         /// The slot of the prior proof
@@ -83,12 +83,10 @@ pub enum ProofType<'a> {
 }
 
 /// Continuations proofs are slightly different depending on how far back the prior proof is.
-/// There are three possibilities here. Either
-/// 1. They are in the same slot
-///     Just prove the prior state root is the same as the current state root
-/// 2. prior_slot < slot <= prior_slot + SLOTS_PER_HISTORICAL_ROOT
+/// There are two possibilities here. Either
+/// 1. prior_slot < slot <= prior_slot + SLOTS_PER_HISTORICAL_ROOT
 ///    Prove the prior state root is in the state_roots list of the current state at (prior_slot % SLOTS_PER_HISTORICAL_ROOT)
-/// 3. slot > prior_slot + SLOTS_PER_HISTORICAL_ROOT
+/// 2. slot > prior_slot + SLOTS_PER_HISTORICAL_ROOT
 ///     This requires doing an extra step. In this case prove an entry in the historical_summaries list of the current state
 ///     and then prove the prior state root is in the state_roots list of the historical summary.
 ///    The element in the historical_summaries list is at index (prior_slot - CAPELLA_FORK_SLOT) / SLOTS_PER_HISTORICAL_ROOT
@@ -98,7 +96,6 @@ pub enum ProofType<'a> {
 ///
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub enum ContinuationType<'a> {
-    SameSlot,
     ShortRange,
     LongRange {
         /// The historical summary multiproof to verify the historical summary root
@@ -108,7 +105,7 @@ pub enum ContinuationType<'a> {
 }
 
 #[cfg(feature = "builder")]
-impl<'a> Input<'a> {
+impl<'a, R> Input<'a, R> {
     /// Build an oracle proof for all validators in the beacon state
     pub async fn build_initial<D, P>(
         spec: &EthChainSpec,
@@ -190,7 +187,7 @@ impl<'a> Input<'a> {
         withdrawal_credentials: &B256,
         withdrawal_vault_address: Address,
         prior_beacon_state: &BeaconState,
-        prior_receipt: Receipt,
+        prior_receipt: R,
         historical_batch: Option<HistoricalBatch>,
         provider: P,
     ) -> Result<Self>
@@ -243,7 +240,7 @@ impl<'a> Input<'a> {
             }));
 
         let cont_type = if slot == prior_slot {
-            ContinuationType::SameSlot
+            return Err(Error::SameSlotContinuation);
         } else if slot <= prior_slot + SLOTS_PER_HISTORICAL_ROOT {
             state_multiproof_builder = state_multiproof_builder
                 .with_gindex(beacon_state_gindices::state_roots(prior_slot).try_into()?);
