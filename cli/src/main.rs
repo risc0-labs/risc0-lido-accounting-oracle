@@ -19,19 +19,19 @@ use alloy::{
     signers::local::PrivateKeySigner,
 };
 use anyhow::{Context, Result};
-use balance_and_exits_builder::{
-    MAINNET_ELF as BALANCE_AND_EXITS_ELF, MAINNET_ID as BALANCE_AND_EXITS_ID,
-};
 use beacon_client::BeaconClient;
 use clap::Parser;
 use ethereum_consensus::phase0::mainnet::{HistoricalBatch, SLOTS_PER_HISTORICAL_ROOT};
-use guest_io::{
+use lido_oracle_core::{
     mainnet::{WITHDRAWAL_CREDENTIALS, WITHDRAWAL_VAULT_ADDRESS},
+    membership::io::Input as MembershipInput,
+    oracle::io::Input as OracleInput,
     ETH_SEPOLIA_CHAIN_SPEC,
 };
 use membership_builder::{
     MAINNET_ELF as VALIDATOR_MEMBERSHIP_ELF, MAINNET_ID as VALIDATOR_MEMBERSHIP_ID,
 };
+use oracle_builder::{MAINNET_ELF as BALANCE_AND_EXITS_ELF, MAINNET_ID as BALANCE_AND_EXITS_ID};
 use risc0_ethereum_contracts::encode_seal;
 use risc0_steel::{ethereum::EthEvmEnv, Account};
 use risc0_zkvm::{default_prover, ExecutorEnv, ProverOpts, Receipt, VerifierContext};
@@ -156,9 +156,7 @@ async fn main() -> Result<()> {
             command: ProveCommand::Initial,
             beacon_rpc_url,
         } => {
-            let input =
-                build_membership_input(beacon_rpc_url, args.slot, args.max_validator_index, None)
-                    .await?;
+            let input = build_membership_input(beacon_rpc_url, args.slot, None).await?;
             let proof =
                 build_membership_proof(input, None, args.slot, args.max_validator_index).await?;
             write(out_path, &bincode::serialize(&proof)?)?;
@@ -169,13 +167,8 @@ async fn main() -> Result<()> {
             beacon_rpc_url,
         } => {
             let prior_proof: MembershipProof = bincode::deserialize(&read(prior_path)?)?;
-            let input = build_membership_input(
-                beacon_rpc_url,
-                args.slot,
-                args.max_validator_index,
-                Some(prior_proof.slot),
-            )
-            .await?;
+            let input =
+                build_membership_input(beacon_rpc_url, args.slot, Some(prior_proof.slot)).await?;
             let proof = build_membership_proof(
                 input,
                 Some(prior_proof),
@@ -224,17 +217,12 @@ async fn main() -> Result<()> {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 struct MembershipProof {
     slot: u64,
-    max_validator_index: u64,
     receipt: Receipt,
 }
 
 impl MembershipProof {
-    pub fn new(slot: u64, max_validator_index: u64, receipt: Receipt) -> Self {
-        Self {
-            slot,
-            max_validator_index,
-            receipt,
-        }
+    pub fn new(slot: u64, receipt: Receipt) -> Self {
+        Self { slot, receipt }
     }
 }
 
@@ -242,11 +230,8 @@ impl MembershipProof {
 async fn build_membership_input<'a>(
     beacon_rpc_url: Url,
     slot: u64,
-    max_validator_index: Option<u64>,
     prior_slot: Option<u64>,
-) -> Result<guest_io::validator_membership::Input<'a>> {
-    use guest_io::validator_membership::Input;
-
+) -> Result<MembershipInput<'a>> {
     let beacon_client = BeaconClient::new_with_cache(beacon_rpc_url, "./beacon-cache")?;
 
     tracing::info!("Retrieving beacon state...");
@@ -263,9 +248,6 @@ async fn build_membership_input<'a>(
             )
             .count()
     );
-
-    let max_validator_index =
-        max_validator_index.unwrap_or((beacon_state.validators().len() - 1) as u64);
 
     let input = if let Some(prior_slot) = prior_slot {
         let hist_summary = if beacon_state.slot() > prior_slot + (SLOTS_PER_HISTORICAL_ROOT as u64)
@@ -286,29 +268,26 @@ async fn build_membership_input<'a>(
 
         tracing::info!("Retrieving intermediate beacon state...");
         let prior_beacon_state = beacon_client.get_beacon_state(prior_slot).await?;
-        let prior_max_validator_index = (prior_beacon_state.validators().len() - 1) as u64;
 
         tracing::info!("Building input. This may take a few minutes...");
-        Input::build_continuation(
+        MembershipInput::build_continuation(
             WITHDRAWAL_CREDENTIALS,
             &prior_beacon_state,
-            prior_max_validator_index,
             &beacon_state,
-            max_validator_index,
             hist_summary,
             VALIDATOR_MEMBERSHIP_ID,
         )?
     } else {
         tracing::info!("Building input. This may take a few minutes...");
 
-        Input::build_initial(beacon_state, max_validator_index, VALIDATOR_MEMBERSHIP_ID)?
+        MembershipInput::build_initial(beacon_state, VALIDATOR_MEMBERSHIP_ID)?
     };
     Ok(input)
 }
 
 #[tracing::instrument(skip(input, prior_proof))]
 async fn build_membership_proof<'a>(
-    input: guest_io::validator_membership::Input<'a>,
+    input: MembershipInput<'a>,
     prior_proof: Option<MembershipProof>,
     slot: u64,
     max_validator_index: Option<u64>,
@@ -334,7 +313,7 @@ async fn build_membership_proof<'a>(
     )?;
     tracing::info!("total cycles: {}", session_info.stats.total_cycles);
 
-    let proof = MembershipProof::new(slot, input.input.max_validator_index, session_info.receipt);
+    let proof = MembershipProof::new(slot, session_info.receipt);
 
     Ok(proof)
 }
@@ -350,7 +329,7 @@ async fn build_aggregate_input<'a>(
     beacon_rpc_url: Url,
     slot: u64,
     eth_rpc_url: Url,
-) -> Result<guest_io::balance_and_exits::Input<'a>> {
+) -> Result<OracleInput<'a>> {
     let beacon_client = BeaconClient::new_with_cache(beacon_rpc_url.clone(), "./beacon-cache")?;
     let beacon_block_header = beacon_client.get_block_header(slot).await?;
 
@@ -373,7 +352,7 @@ async fn build_aggregate_input<'a>(
 
     let evm_input = env.into_input().await?;
 
-    let input = guest_io::balance_and_exits::Input::build(
+    let input = OracleInput::build(
         WITHDRAWAL_CREDENTIALS,
         &beacon_block_header.message,
         &beacon_state,
@@ -385,7 +364,7 @@ async fn build_aggregate_input<'a>(
 
 #[tracing::instrument(skip(input, membership_proof))]
 async fn build_aggregate_proof<'a>(
-    input: guest_io::balance_and_exits::Input<'a>,
+    input: OracleInput<'a>,
     membership_proof: MembershipProof,
     slot: u64,
 ) -> Result<AggregateProof> {

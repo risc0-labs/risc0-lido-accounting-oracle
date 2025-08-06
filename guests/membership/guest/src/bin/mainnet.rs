@@ -1,6 +1,6 @@
 #![no_main]
 
-use guest_io::mainnet::WITHDRAWAL_CREDENTIALS;
+use lido_oracle_core::mainnet::WITHDRAWAL_CREDENTIALS;
 
 risc0_zkvm::guest::entry!(main);
 

@@ -4,7 +4,7 @@ use ethereum_consensus::capella::presets::mainnet::{
 };
 use ethereum_consensus::ssz::prelude::*;
 use gindices::presets::mainnet::beacon_state::{CAPELLA_FORK_SLOT, SLOTS_PER_HISTORICAL_ROOT};
-use guest_io::mainnet::WITHDRAWAL_CREDENTIALS;
+use lido_oracle_core::mainnet::WITHDRAWAL_CREDENTIALS;
 
 pub struct TestStateBuilder {
     inner: ElectraBeaconState,

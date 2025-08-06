@@ -1,5 +1,5 @@
 [package]
-name = "balance_and_exits"
+name = "oracle"
 edition = "2021"
 
 [workspace]
@@ -9,7 +9,7 @@ anvil = []
 skip-verify = []
 
 [dependencies]
-guest-io = { path = "../../../crates/guest-io", default-features = false }
+lido_oracle_core = { path = "../../../crates/core", default-features = false }
 gindices = { path = "../../../crates/gindices" }
 membership_builder = { path = "../../membership" }
 

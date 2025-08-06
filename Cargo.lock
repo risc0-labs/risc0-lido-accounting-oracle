@@ -1453,30 +1453,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "balance_and_exits_builder"
-version = "0.1.0"
-dependencies = [
- "alloy",
- "alloy-primitives",
- "alloy-sol-types",
- "anyhow",
- "bincode",
- "bitvec",
- "ethereum-consensus 0.1.1 (git+https://github.com/ralexstokes/ethereum-consensus.git?rev=ade5ce6c4a19107c1059e5338d8f18855bd2d931)",
- "gindices",
- "guest-io",
- "hex",
- "membership_builder",
- "risc0-build",
- "risc0-build-ethereum",
- "risc0-steel",
- "risc0-zkp",
- "risc0-zkvm",
- "test-utils",
- "tokio",
-]
-
-[[package]]
 name = "base16ct"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1900,16 +1876,16 @@ dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
  "anyhow",
- "balance_and_exits_builder",
  "beacon-state",
  "bincode",
  "bytemuck",
  "clap",
  "ethereum-consensus 0.1.1 (git+https://github.com/ralexstokes/ethereum-consensus.git?rev=ade5ce6c4a19107c1059e5338d8f18855bd2d931)",
- "guest-io",
  "http-cache-reqwest",
+ "lido_oracle_core",
  "log",
  "membership_builder",
+ "oracle_builder",
  "reqwest 0.12.22",
  "reqwest-cache",
  "reqwest-middleware 0.4.2",
@@ -3074,27 +3050,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "guest-io"
-version = "0.1.0"
-dependencies = [
- "alloy-primitives",
- "alloy-sol-types",
- "beacon-state",
- "bitvec",
- "bytemuck",
- "ethereum-consensus 0.1.1 (git+https://github.com/ralexstokes/ethereum-consensus.git?rev=ade5ce6c4a19107c1059e5338d8f18855bd2d931)",
- "gindices",
- "revm",
- "risc0-steel",
- "risc0-zkvm",
- "serde",
- "ssz-multiproofs",
- "ssz_rs",
- "thiserror 2.0.12",
- "tracing",
-]
-
-[[package]]
 name = "h2"
 version = "0.3.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3978,6 +3933,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "lido_oracle_core"
+version = "0.1.0"
+dependencies = [
+ "alloy-primitives",
+ "alloy-sol-types",
+ "beacon-state",
+ "bitvec",
+ "bytemuck",
+ "ethereum-consensus 0.1.1 (git+https://github.com/ralexstokes/ethereum-consensus.git?rev=ade5ce6c4a19107c1059e5338d8f18855bd2d931)",
+ "gindices",
+ "revm",
+ "risc0-steel",
+ "risc0-zkvm",
+ "serde",
+ "ssz-multiproofs",
+ "ssz_rs",
+ "thiserror 2.0.12",
+ "tracing",
+]
+
+[[package]]
 name = "linked-hash-map"
 version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4156,8 +4132,8 @@ dependencies = [
  "bitvec",
  "ethereum-consensus 0.1.1 (git+https://github.com/ralexstokes/ethereum-consensus.git?rev=ade5ce6c4a19107c1059e5338d8f18855bd2d931)",
  "gindices",
- "guest-io",
  "hex",
+ "lido_oracle_core",
  "risc0-build",
  "risc0-build-ethereum",
  "risc0-zkp",
@@ -4647,6 +4623,30 @@ name = "option-ext"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
+
+[[package]]
+name = "oracle_builder"
+version = "0.1.0"
+dependencies = [
+ "alloy",
+ "alloy-primitives",
+ "alloy-sol-types",
+ "anyhow",
+ "bincode",
+ "bitvec",
+ "ethereum-consensus 0.1.1 (git+https://github.com/ralexstokes/ethereum-consensus.git?rev=ade5ce6c4a19107c1059e5338d8f18855bd2d931)",
+ "gindices",
+ "hex",
+ "lido_oracle_core",
+ "membership_builder",
+ "risc0-build",
+ "risc0-build-ethereum",
+ "risc0-steel",
+ "risc0-zkp",
+ "risc0-zkvm",
+ "test-utils",
+ "tokio",
+]
 
 [[package]]
 name = "overload"
@@ -7060,7 +7060,7 @@ dependencies = [
  "bitvec",
  "ethereum-consensus 0.1.1 (git+https://github.com/ralexstokes/ethereum-consensus.git?rev=ade5ce6c4a19107c1059e5338d8f18855bd2d931)",
  "gindices",
- "guest-io",
+ "lido_oracle_core",
 ]
 
 [[package]]

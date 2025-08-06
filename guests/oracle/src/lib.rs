@@ -23,9 +23,9 @@ mod tests {
     use ethereum_consensus::ssz::prelude::*;
     use gindices::presets::mainnet::beacon_state::CAPELLA_FORK_SLOT;
     use guest_io::{
-        balance_and_exits::{self, Journal},
         mainnet::WITHDRAWAL_CREDENTIALS,
         mainnet::WITHDRAWAL_VAULT_ADDRESS,
+        oracle::{self, Journal},
         validator_membership, ANVIL_CHAIN_SPEC,
     };
     use risc0_steel::{ethereum::EthEvmEnv, Account};
@@ -51,7 +51,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn test_balance_and_exits() -> anyhow::Result<()> {
+    async fn test_oracle() -> anyhow::Result<()> {
         let n_validators = 10;
         let n_lido_validators = 1;
         let max_validator_index = n_validators + n_lido_validators - 1;
@@ -103,13 +103,9 @@ mod tests {
         };
         assert_eq!(info, preflight_info, "mismatch in preflight and execution");
 
-        let zkvm_input = balance_and_exits::Input::build(
-            WITHDRAWAL_CREDENTIALS,
-            &block_header,
-            &s.clone(),
-            input,
-        )?
-        .with_receipt(membership_proof.receipt);
+        let zkvm_input =
+            oracle::Input::build(WITHDRAWAL_CREDENTIALS, &block_header, &s.clone(), input)?
+                .with_receipt(membership_proof.receipt);
         let env = ExecutorEnv::builder()
             .write_frame(&bincode::serialize(&zkvm_input).unwrap())
             .build()?;

@@ -13,7 +13,9 @@
 // limitations under the License.
 
 mod error;
-mod io;
+pub mod io;
+pub mod membership;
+pub mod oracle;
 
 use revm::primitives::hardfork::SpecId;
 use risc0_steel::config::{ChainSpec, ForkCondition};
@@ -21,6 +23,8 @@ use risc0_steel::ethereum::EthChainSpec;
 pub use risc0_steel::ethereum::ETH_SEPOLIA_CHAIN_SPEC;
 use std::collections::BTreeMap;
 use std::sync::LazyLock;
+
+type Node = [u8; 32];
 
 pub mod mainnet {
     use alloy_primitives::{address, Address};

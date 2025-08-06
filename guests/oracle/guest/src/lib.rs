@@ -12,33 +12,36 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use alloy_primitives::B256;
+use alloy_primitives::Address;
+use alloy_sol_types::SolValue;
 use bincode::deserialize;
-use lido_oracle_core::io::InputWithReceipt;
-use lido_oracle_core::membership::{io::Journal, update_membership};
+use lido_oracle_core::oracle::generate_oracle_report;
+use lido_oracle_core::InputWithReceipt;
+use risc0_steel::ethereum::EthChainSpec;
 use risc0_zkvm::guest::env;
 
-pub fn entry(withdrawal_credentials: B256) {
+pub fn entry(
+    spec: &EthChainSpec,
+    withdrawal_vault_address: Address,
+    membership_program_id: [u32; 8],
+) {
     env::log("Reading input");
     let input_bytes = env::read_frame();
 
     env::log("Deserializing input");
     let InputWithReceipt {
         input,
-        receipt: prior_receipt,
+        receipt: membership_receipt,
     } = deserialize(&input_bytes).expect("Failed to deserialize input");
 
-    env::log("Applying membership update");
-    let updated_membership =
-        update_membership(&input, prior_receipt, withdrawal_credentials.as_ref())
-            .expect("Failed to update membership");
+    let journal = generate_oracle_report(
+        spec,
+        &input,
+        membership_receipt.expect("Membership receipt is required"),
+        membership_program_id,
+        withdrawal_vault_address,
+    )
+    .expect("Failed to Generate oracle report");
 
-    let journal = Journal {
-        self_program_id: input.self_program_id,
-        state_root: input.state_root,
-        membership: updated_membership,
-    };
-
-    env::commit(&journal);
-    env::log("Execution complete");
+    env::commit_slice(&journal.abi_encode());
 }

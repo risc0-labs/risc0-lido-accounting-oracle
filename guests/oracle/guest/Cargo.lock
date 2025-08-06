@@ -870,26 +870,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "balance_and_exits"
-version = "0.0.0"
-dependencies = [
- "alloy-primitives",
- "alloy-sol-types",
- "bincode",
- "bitvec",
- "gindices",
- "guest-io",
- "membership_builder",
- "risc0-steel",
- "risc0-zkp",
- "risc0-zkvm",
- "risc0-zkvm-platform",
- "serde",
- "ssz-multiproofs",
- "tracing",
-]
-
-[[package]]
 name = "base16ct"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1896,23 +1876,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "guest-io"
-version = "0.1.0"
-dependencies = [
- "alloy-primitives",
- "alloy-sol-types",
- "bitvec",
- "bytemuck",
- "revm",
- "risc0-steel",
- "risc0-zkvm",
- "serde",
- "ssz-multiproofs",
- "thiserror 2.0.12",
- "tracing",
-]
-
-[[package]]
 name = "hashbrown"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2478,6 +2441,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "lido_oracle_core"
+version = "0.1.0"
+dependencies = [
+ "alloy-primitives",
+ "alloy-sol-types",
+ "bitvec",
+ "bytemuck",
+ "gindices",
+ "revm",
+ "risc0-steel",
+ "risc0-zkvm",
+ "serde",
+ "ssz-multiproofs",
+ "thiserror 2.0.12",
+ "tracing",
+]
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2792,6 +2773,26 @@ name = "option-ext"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
+
+[[package]]
+name = "oracle"
+version = "0.0.0"
+dependencies = [
+ "alloy-primitives",
+ "alloy-sol-types",
+ "bincode",
+ "bitvec",
+ "gindices",
+ "lido_oracle_core",
+ "membership_builder",
+ "risc0-steel",
+ "risc0-zkp",
+ "risc0-zkvm",
+ "risc0-zkvm-platform",
+ "serde",
+ "ssz-multiproofs",
+ "tracing",
+]
 
 [[package]]
 name = "p256"

@@ -8,9 +8,9 @@ default = []
 
 [dependencies]
 ssz-multiproofs.workspace = true
-guest-io = { workspace = true, features = ["builder"] }
+lido_oracle_core = { workspace = true, features = ["builder"] }
 membership_builder.workspace = true
-balance_and_exits_builder.workspace = true
+oracle_builder.workspace = true
 beacon-state = { workspace = true }
 
 alloy = { workspace = true }

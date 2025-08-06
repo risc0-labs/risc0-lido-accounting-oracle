@@ -8,7 +8,7 @@ edition = "2021"
 skip-verify = []
 
 [dependencies]
-guest-io = { path = "../../../crates/guest-io", default-features = false }
+lido_oracle_core = { path = "../../../crates/core", default-features = false }
 gindices = { path = "../../../crates/gindices" }
 
 bitvec = { version = "1", features = ["serde"] }
