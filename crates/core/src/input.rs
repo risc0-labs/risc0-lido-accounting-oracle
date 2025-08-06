@@ -1,5 +1,11 @@
+#[cfg(feature = "builder")]
+use alloy_primitives::Address;
 use alloy_primitives::B256;
 use bitvec::prelude::*;
+#[cfg(feature = "builder")]
+use risc0_steel::alloy::providers::Provider;
+#[cfg(feature = "builder")]
+use risc0_steel::ethereum::EthChainSpec;
 use risc0_steel::ethereum::EthEvmInput;
 use risc0_zkvm::{Digest, Receipt};
 use ssz_multiproofs::Multiproof;
@@ -13,6 +19,7 @@ use {
     gindices::presets::mainnet::{
         beacon_block as beacon_block_gindices, beacon_state::post_electra as beacon_state_gindices,
     },
+    risc0_steel::Account,
     ssz_multiproofs::MultiproofBuilder,
     ssz_rs::prelude::*,
 };
@@ -87,13 +94,21 @@ pub enum ContinuationType<'a> {
 #[cfg(feature = "builder")]
 impl<'a> Input<'a> {
     /// Build an oracle proof for all validators in the beacon state
-    pub fn build_initial<D: Into<Digest>>(
+    pub async fn build_initial<D, P>(
+        spec: &EthChainSpec,
         self_program_id: D,
         block_header: &BeaconBlockHeader,
         beacon_state: &BeaconState,
-        withdrawal_credentials: B256,
-        evm_input: EthEvmInput,
-    ) -> Result<Self> {
+        withdrawal_credentials: &B256,
+        withdrawal_vault_address: Address,
+        provider: P,
+    ) -> Result<Self>
+    where
+        D: Into<Digest>,
+        P: Provider + 'static,
+    {
+        use risc0_steel::ethereum::EthEvmEnv;
+
         let block_root = block_header.hash_tree_root()?;
 
         let membership = beacon_state
@@ -126,6 +141,19 @@ impl<'a> Input<'a> {
             }));
 
         let state_multiproof = build_with_versioned_state(state_multiproof_builder, &beacon_state)?;
+
+        // build the Steel input for reading the balance
+        let mut env = EthEvmEnv::builder()
+            .provider(provider)
+            .chain_spec(&spec)
+            .build()
+            .await
+            .unwrap();
+        let _preflight_info = {
+            let account = Account::preflight(withdrawal_vault_address, &mut env);
+            account.bytecode(true).info().await.unwrap()
+        };
+        let evm_input = env.into_input().await.unwrap();
 
         Ok(Self {
             self_program_id: self_program_id.into(),

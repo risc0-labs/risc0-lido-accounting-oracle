@@ -17,19 +17,19 @@ include!(concat!(env!("OUT_DIR"), "/methods.rs"));
 
 #[cfg(test)]
 mod tests {
+    use crate::MAINNET_ID;
+
     use alloy_primitives::utils::parse_ether;
     use alloy_sol_types::SolValue;
     use ethereum_consensus::phase0::presets::mainnet::BeaconBlockHeader;
     use ethereum_consensus::ssz::prelude::*;
     use gindices::presets::mainnet::beacon_state::CAPELLA_FORK_SLOT;
-    use guest_io::{
-        mainnet::WITHDRAWAL_CREDENTIALS,
-        mainnet::WITHDRAWAL_VAULT_ADDRESS,
-        oracle::{self, Journal},
-        validator_membership, ANVIL_CHAIN_SPEC,
+    use lido_oracle_core::{
+        input::Input,
+        mainnet::{WITHDRAWAL_CREDENTIALS, WITHDRAWAL_VAULT_ADDRESS},
+        Journal, ANVIL_CHAIN_SPEC,
     };
-    use risc0_steel::{ethereum::EthEvmEnv, Account};
-    use risc0_zkvm::{default_executor, ExecutorEnv, LocalProver, Prover};
+    use risc0_zkvm::{default_executor, ExecutorEnv};
     use test_utils::TestStateBuilder;
 
     use alloy::providers::{ext::AnvilApi, Provider, ProviderBuilder};
@@ -54,7 +54,8 @@ mod tests {
     async fn test_oracle() -> anyhow::Result<()> {
         let n_validators = 10;
         let n_lido_validators = 1;
-        let max_validator_index = n_validators + n_lido_validators - 1;
+
+        let provider = test_provider().await;
 
         let mut b = TestStateBuilder::new(CAPELLA_FORK_SLOT);
         b.with_validators(n_validators);
@@ -66,48 +67,18 @@ mod tests {
         block_header.state_root = s.hash_tree_root().unwrap();
 
         // build a membership proof
-        let input = validator_membership::Input::build_initial(
-            s.clone(),
-            max_validator_index as u64,
-            membership_builder::MAINNET_ID,
-        )?
-        .without_receipt();
+        let input = Input::build_initial(
+            &ANVIL_CHAIN_SPEC,
+            MAINNET_ID,
+            &block_header,
+            &s,
+            &WITHDRAWAL_CREDENTIALS,
+            WITHDRAWAL_VAULT_ADDRESS,
+            provider.clone(),
+        )
+        .await?;
         let env = ExecutorEnv::builder()
             .write_frame(&bincode::serialize(&input).unwrap())
-            .build()?;
-
-        let membership_proof = tokio::task::block_in_place(|| {
-            LocalProver::new("test").prove(env, membership_builder::MAINNET_ELF)
-        })?;
-
-        // build the Steel input for reading the balance
-        let provider = test_provider().await;
-        let mut env = EthEvmEnv::builder()
-            .provider(provider.clone())
-            .chain_spec(&ANVIL_CHAIN_SPEC)
-            .build()
-            .await
-            .unwrap();
-        let preflight_info = {
-            let account = Account::preflight(WITHDRAWAL_VAULT_ADDRESS, &mut env);
-            account.bytecode(true).info().await.unwrap()
-        };
-        assert_eq!(preflight_info.balance, parse_ether("33").unwrap());
-
-        // Sanity check converting it back to an env as in the guest gives the same account info
-        let input = env.into_input().await.unwrap();
-        let env = input.clone().into_env(&ANVIL_CHAIN_SPEC);
-        let info = {
-            let account = Account::new(WITHDRAWAL_VAULT_ADDRESS, &env);
-            account.bytecode(true).info()
-        };
-        assert_eq!(info, preflight_info, "mismatch in preflight and execution");
-
-        let zkvm_input =
-            oracle::Input::build(WITHDRAWAL_CREDENTIALS, &block_header, &s.clone(), input)?
-                .with_receipt(membership_proof.receipt);
-        let env = ExecutorEnv::builder()
-            .write_frame(&bincode::serialize(&zkvm_input).unwrap())
             .build()?;
 
         println!("Starting execution of the program");

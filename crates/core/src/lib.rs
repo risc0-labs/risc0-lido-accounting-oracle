@@ -22,6 +22,8 @@ use beacon_state::mainnet::BeaconState;
 pub use generate_report::generate_oracle_report;
 
 pub use error::{Error, Result};
+pub use input::Input;
+pub use journal::Journal;
 
 use revm::primitives::hardfork::SpecId;
 use risc0_steel::config::{ChainSpec, ForkCondition};
