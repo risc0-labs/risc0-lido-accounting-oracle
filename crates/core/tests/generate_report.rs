@@ -15,7 +15,6 @@
 use oracle_builder::MAINNET_ID;
 
 use alloy_primitives::utils::parse_ether;
-use alloy_sol_types::SolValue;
 use ethereum_consensus::phase0::presets::mainnet::BeaconBlockHeader;
 use ethereum_consensus::ssz::prelude::*;
 use gindices::presets::mainnet::beacon_state::CAPELLA_FORK_SLOT;
@@ -23,7 +22,7 @@ use lido_oracle_core::{
     generate_oracle_report,
     input::Input,
     mainnet::{WITHDRAWAL_CREDENTIALS, WITHDRAWAL_VAULT_ADDRESS},
-    Journal, ANVIL_CHAIN_SPEC,
+    ANVIL_CHAIN_SPEC,
 };
 use test_utils::TestStateBuilder;
 
@@ -45,8 +44,8 @@ async fn test_provider() -> impl Provider + Clone {
     provider
 }
 
-#[tokio::test(flavor = "multi_thread")]
-async fn test_oracle() -> anyhow::Result<()> {
+#[tokio::test]
+async fn test_simple_initial() -> anyhow::Result<()> {
     let n_validators = 10;
     let n_lido_validators = 1;
 
@@ -61,7 +60,6 @@ async fn test_oracle() -> anyhow::Result<()> {
     block_header.slot = s.slot();
     block_header.state_root = s.hash_tree_root().unwrap();
 
-    // build a membership proof
     let input = Input::build_initial(
         &ANVIL_CHAIN_SPEC,
         MAINNET_ID,
@@ -73,12 +71,18 @@ async fn test_oracle() -> anyhow::Result<()> {
     )
     .await?;
 
-    generate_oracle_report(
+    let journal = generate_oracle_report(
         &input,
         &ANVIL_CHAIN_SPEC,
         &WITHDRAWAL_CREDENTIALS,
         WITHDRAWAL_VAULT_ADDRESS,
     )?;
+
+    assert_eq!(
+        journal.withdrawalVaultBalanceWei,
+        parse_ether("33").unwrap()
+    );
+    assert_eq!(journal.clBalanceGwei, U256::from(10 * n_lido_validators));
 
     Ok(())
 }
