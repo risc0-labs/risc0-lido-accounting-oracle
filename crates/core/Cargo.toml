@@ -21,6 +21,7 @@ thiserror = "2.0.6"
 tracing.workspace = true
 bytemuck.workspace = true
 revm = { workspace = true }
+sha2 = { workspace = true}
 
 
 # Optional dependencies

@@ -15,30 +15,25 @@
 use alloy_primitives::Address;
 use alloy_sol_types::SolValue;
 use bincode::deserialize;
-use lido_oracle_core::oracle::generate_oracle_report;
-use lido_oracle_core::InputWithReceipt;
+use lido_oracle_core::{generate_oracle_report, input::Input};
 use risc0_steel::ethereum::EthChainSpec;
 use risc0_zkvm::guest::env;
 
 pub fn entry(
     spec: &EthChainSpec,
+    withdrawal_credentials: &[u8; 32],
     withdrawal_vault_address: Address,
-    membership_program_id: [u32; 8],
 ) {
     env::log("Reading input");
     let input_bytes = env::read_frame();
 
     env::log("Deserializing input");
-    let InputWithReceipt {
-        input,
-        receipt: membership_receipt,
-    } = deserialize(&input_bytes).expect("Failed to deserialize input");
+    let input: Input = deserialize(&input_bytes).expect("Failed to deserialize input");
 
     let journal = generate_oracle_report(
-        spec,
         &input,
-        membership_receipt.expect("Membership receipt is required"),
-        membership_program_id,
+        spec,
+        withdrawal_credentials,
         withdrawal_vault_address,
     )
     .expect("Failed to Generate oracle report");

@@ -1,34 +1,39 @@
-use crate::membership::io::Journal as MembershipJounal;
+use crate::input::{
+    ContinuationType::{LongRange, SameSlot, ShortRange},
+    Input, ProofType,
+};
+use crate::journal::Journal;
 use crate::{u64_from_b256, Node};
 use alloy_primitives::{Address, U256};
+use alloy_sol_types::SolType;
 use bitvec::prelude::*;
 use bitvec::vec::BitVec;
-use gindices::presets::mainnet::beacon_block as beacon_block_gindices;
 use gindices::presets::mainnet::beacon_state::post_electra as beacon_state_gindices;
+use gindices::presets::mainnet::{
+    beacon_block as beacon_block_gindices, historical_batch as historical_batch_gindices,
+};
 use risc0_steel::ethereum::EthChainSpec;
 use risc0_steel::Account;
 use risc0_zkvm::guest::env;
-use risc0_zkvm::Receipt;
+use sha2::{Digest, Sha256};
 use ssz_multiproofs::ValueIterator;
 
 use crate::error::Result;
-use io::{Input, Journal};
-
-pub mod io;
+use bytemuck::cast_slice;
 
 pub fn generate_oracle_report(
-    spec: &EthChainSpec,
     input: &Input,
-    membership_receipt: Receipt,
-    membership_program_id: [u32; 8],
+    spec: &EthChainSpec,
+    withdrawal_credentials: &[u8; 32],
     withdrawal_vault_address: Address,
 ) -> Result<Journal> {
     let Input {
+        self_program_id,
         block_root,
-        membership,
         block_multiproof,
         state_multiproof: multiproof,
         evm_input,
+        proof_type,
     } = input;
 
     // obtain the withdrawal vault balance from the EVM input
@@ -51,49 +56,87 @@ pub fn generate_oracle_report(
         .expect("Failed to verify state multiproof");
     let mut values = multiproof.values();
 
-    // Compute the required values from the beacon state values
+    let mut membership = match proof_type {
+        ProofType::Initial => BitVec::<u32, Lsb0>::new(),
+        ProofType::Continuation {
+            prior_membership,
+            cont_type,
+            prior_receipt,
+            prior_slot,
+            prior_state_root,
+        } => {
+            match cont_type {
+                SameSlot => {
+                    assert_eq!(state_root, prior_state_root);
+                }
+                ShortRange => {
+                    let stored_root = values
+                        .next_assert_gindex(beacon_state_gindices::state_roots(*prior_slot))?;
+                    assert_eq!(stored_root, &prior_state_root);
+                }
+                LongRange {
+                    hist_summary_multiproof,
+                } => {
+                    let historical_summary_root =
+                        multiproof // using a get here for now but this does cause an extra iteration through the values
+                            .get(beacon_state_gindices::historical_summaries(
+                                *prior_slot,
+                            ))
+                            .unwrap();
+                    hist_summary_multiproof
+                        .verify(&historical_summary_root)
+                        .expect("Failed to verify historical summary multiproof given the root in the current state");
+                    let stored_root = hist_summary_multiproof
+                        .get(historical_batch_gindices::state_roots(*prior_slot))
+                        .unwrap();
+                    assert_eq!(stored_root, &prior_state_root);
+                }
+            }
+
+            let journal = Journal::abi_decode(&prior_receipt.journal.bytes)
+                .expect("journal ABI decode failed");
+            assert_eq!(journal.membershipCommitment, hash_bitvec(&prior_membership));
+
+            prior_receipt
+                .verify(*self_program_id)
+                .expect("Failed to verify prior receipt");
+
+            prior_membership.clone() // TODO: Avoid cloning this it is large
+        }
+    };
+
+    let n_validators = u64_from_b256(
+        values.next_assert_gindex(beacon_state_gindices::validator_count())?,
+        0,
+    );
+
+    // Reserve the capacity for the membership bitvector to save cycles reallocating
+    membership.reserve(n_validators.saturating_sub(membership.len() as u64) as usize);
+
+    for validator_index in (membership.len() as u64 + 1)..n_validators {
+        let value = values.next_assert_gindex(
+            beacon_state_gindices::validator_withdrawal_credentials(validator_index),
+        )?;
+        membership.push(value == withdrawal_credentials);
+    }
+
+    // Compute the required oracle values from the beacon state values
     env::log("Computing validator count, balances, exited validators");
-    let num_validators = membership.count_ones() as u64;
     let num_exited_validators = count_exited_validators(&mut values, &membership, slot);
     let cl_balance = accumulate_balances(&mut values, &membership);
-
-    env::log("Verifying validator membership proof");
-    verify_membership(
-        membership_program_id,
-        state_root,
-        membership,
-        membership_receipt,
-    );
 
     // Commit the journal
     let journal = Journal {
         clBalanceGwei: U256::from(cl_balance),
         withdrawalVaultBalanceWei: withdrawal_vault_balance.into(),
-        totalDepositedValidators: U256::from(num_validators),
+        totalDepositedValidators: U256::from(n_validators),
         totalExitedValidators: U256::from(num_exited_validators),
         blockRoot: *block_root,
         commitment: evm_env.into_commitment(),
+        membershipCommitment: hash_bitvec(&membership).into(),
     };
 
     Ok(journal)
-}
-
-fn verify_membership(
-    membership_program_id: [u32; 8],
-    state_root: &Node,
-    membership: &BitVec<u32, Lsb0>,
-    membership_receipt: Receipt,
-) {
-    let j = MembershipJounal {
-        self_program_id: membership_program_id.into(),
-        state_root: state_root.clone().into(),
-        membership: membership.clone(), // TODO: Avoid cloning this it is large
-    };
-    let membership_receipt = membership_receipt;
-    assert_eq!(membership_receipt.journal.bytes, j.to_bytes().unwrap());
-    membership_receipt
-        .verify(membership_program_id)
-        .expect("Failed to verify membership receipt");
 }
 
 fn get_slot<'a, I: Iterator<Item = (u64, &'a Node)>>(values: &mut ValueIterator<'a, I, 32>) -> u64 {
@@ -154,4 +197,19 @@ fn accumulate_balances<'a, I: Iterator<Item = (u64, &'a Node)>>(
         cl_balance += balance;
     }
     cl_balance
+}
+
+/// Hash a bitvec in a way that includes the bitlength. Just hashing the underlying bytes is not sufficient
+/// as any bits above the bitlength would be malleable
+fn hash_bitvec(bv: &BitVec<u32>) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+
+    // Hash bit length first
+    hasher.update(&bv.len().to_le_bytes());
+
+    // Then hash the actual bits as bytes
+    let bytes = bv.clone().into_vec();
+    hasher.update(cast_slice(&bytes));
+
+    hasher.finalize().into()
 }

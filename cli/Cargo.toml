@@ -9,7 +9,6 @@ default = []
 [dependencies]
 ssz-multiproofs.workspace = true
 lido_oracle_core = { workspace = true, features = ["builder"] }
-membership_builder.workspace = true
 oracle_builder.workspace = true
 beacon-state = { workspace = true }
 

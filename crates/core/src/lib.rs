@@ -13,14 +13,22 @@
 // limitations under the License.
 
 mod error;
-pub mod io;
-pub mod membership;
-pub mod oracle;
+mod generate_report;
+pub mod input;
+pub mod journal;
+
+#[cfg(feature = "builder")]
+use beacon_state::mainnet::BeaconState;
+pub use generate_report::generate_oracle_report;
+
+pub use error::{Error, Result};
 
 use revm::primitives::hardfork::SpecId;
 use risc0_steel::config::{ChainSpec, ForkCondition};
 use risc0_steel::ethereum::EthChainSpec;
 pub use risc0_steel::ethereum::ETH_SEPOLIA_CHAIN_SPEC;
+#[cfg(feature = "builder")]
+use ssz_multiproofs::{Multiproof, MultiproofBuilder};
 use std::collections::BTreeMap;
 use std::sync::LazyLock;
 
@@ -57,5 +65,25 @@ pub static ANVIL_CHAIN_SPEC: LazyLock<EthChainSpec> = LazyLock::new(|| ChainSpec
     forks: BTreeMap::from([(SpecId::PRAGUE, ForkCondition::Timestamp(0))]),
 });
 
-pub use error::{Error, Result};
-pub use io::*;
+#[cfg(feature = "builder")]
+pub(crate) fn build_with_versioned_state(
+    builder: MultiproofBuilder,
+    beacon_state: &BeaconState,
+) -> Result<Multiproof<'static>> {
+    use beacon_state::BeaconState;
+
+    match beacon_state {
+        BeaconState::Phase0(b) => Ok(builder.build(b)?),
+        BeaconState::Altair(b) => Ok(builder.build(b)?),
+        BeaconState::Bellatrix(b) => Ok(builder.build(b)?),
+        BeaconState::Capella(b) => Ok(builder.build(b)?),
+        BeaconState::Deneb(b) => Ok(builder.build(b)?),
+        BeaconState::Electra(b) => Ok(builder.build(b)?),
+    }
+}
+
+/// Slice an 8 byte u64 out of a 32 byte chunk
+/// pos gives the position (e.g. first 8 bytes, second 8 bytes, etc.)
+pub(crate) fn u64_from_b256(node: &Node, pos: usize) -> u64 {
+    u64::from_le_bytes(node[pos * 8..(pos + 1) * 8].try_into().unwrap())
+}

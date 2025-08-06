@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["cli", "guests/membership", "guests/oracle", "crates/gindices", "crates/core", "crates/test-utils", "crates/beacon-state"]
+members = ["guests/oracle", "crates/gindices", "crates/core", "crates/test-utils", "crates/beacon-state"]
 
 [workspace.package]
 version = "0.1.0"
@@ -10,7 +10,6 @@ license = "Apache-2.0"
 [workspace.dependencies]
 gindices.path = "./crates/gindices"
 lido_oracle_core.path = "./crates/core"
-membership_builder.path = "./guests/membership"
 oracle_builder.path = "./guests/oracle"
 test-utils.path = "./crates/test-utils"
 beacon-state.path = "./crates/beacon-state"

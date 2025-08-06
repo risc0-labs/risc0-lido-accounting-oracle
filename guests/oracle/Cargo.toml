@@ -27,7 +27,6 @@ lido_oracle_core = { workspace = true, features = ["builder"] }
 bitvec = { workspace = true }
 ethereum-consensus = { workspace = true }
 anyhow = { workspace = true }
-membership_builder = { path = "../membership" }
 test-utils = { workspace = true }
 bincode = { workspace = true }
 tokio = { workspace = true }
